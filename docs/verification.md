@@ -56,3 +56,13 @@ continuity cases; 16 Python HTTP/release-gate/presenter tests; real Compose
 integration (fulfillment, concurrent idempotency, conflict and validation).
 API image rebuilt and healthy; browser confirmed operational status and actual
 observation timestamp. Remote CI for this change is a separate verification.
+
+## Recovery and broker audit, 2026-10-06
+
+- 14 Node tests: order recovery, response matching, Web Locks, store validation, event decoding, quarantine failure rollback and existing status/cache checks.
+- 16 Python HTTP/release-gate/presenter tests passed.
+- Real Compose integration passed with PostgreSQL, Redis and Kafka.
+- `python scripts/broker_contract.py`: malformed and forged events were quarantined, two duplicate deliveries had one business receipt, and the consumer committed past those offsets.
+- Six Prometheus rules passed promtool.
+- Browser: confirmed order survived reload; PostgreSQL was stopped, a new request remained unknown across reload with product selection disabled, then recovered using the same key after PostgreSQL restarted. The resulting order completed.
+- Browser persistence is scoped to one origin/profile. Use the same address consistently. No cross-device deduplication claim is made.

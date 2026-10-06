@@ -30,3 +30,18 @@ The automated drill stops the broker, verifies pending durable orders, restarts 
 Use `ss -lntp` for listeners, `dig SERVICE` for name resolution, and a narrow `tcpdump` filter for handshake/retransmission evidence. Use `strace` only on the relevant process and avoid capturing secrets. On a VM, inspect `systemctl status` and `journalctl -u`; inside Kubernetes inspect pod events and logs.
 
 `REJECT` generally returns an immediate error; `DROP` typically waits for retry/timeouts. Both can look like dependency failure but produce different request latency and connection-pool pressure. Reproduce network faults only in a disposable namespace. No packet-filter changes are automated here.
+
+## Rejected Kafka events
+
+`ReleaseGuardRejectedEvents` reports recent increments of `rg_events_rejected_total`.
+Inspect `rejected_events` by topic, partition_id and event_offset. The reason is
+`invalid_payload` or `unrecognized_event`; raw messages are not copied into diagnostics.
+A valid event must match its durable outbox ID and order ID. Quarantine commits
+before the handler returns; a failed quarantine write throws and permits retry.
+Do not blindly replay malformed events. Correct the producer, compare the durable
+outbox and processed_events records, then use a reviewed replay with the original
+event ID. This lab does not automate quarantine retention or replay.
+
+Run `python scripts/broker_contract.py` to reproduce invalid/forged/duplicate
+deliveries in the local synthetic topic. This intentionally increments the rejection
+metric and may trigger its warning. The test waits for consumer offsets to advance.

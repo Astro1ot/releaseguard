@@ -138,3 +138,5 @@ docs/                Architecture, runbooks and honest verification record
 ```
 
 License: [MIT](LICENSE). Independent educational project; not affiliated with Playerok.
+
+Orders now persist their recovery key across browser reloads and use a separate read-only status check. Invalid Kafka deliveries are quarantined before offsets advance; `python scripts/broker_contract.py` checks this against the real lab.

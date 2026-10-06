@@ -10,3 +10,13 @@ Prepare the full Compose lab and a separate kind namespace before recording. Col
 6. **4:45 — Tradeoffs.** State three limitations: process-local status history, single ephemeral broker and no production TLS/secret provider. Describe the next engineering change you would make and why.
 
 For an early demo without Docker, show the UI and HTTP contract only. Say explicitly that the in-memory mode does not test database locks, broker recovery or Helm rollback.
+
+## Browser order recovery
+
+Create a test order, reload the page, then press **Check order status**. The saved
+order ID remains the same; this button only reads status. If creation is uncertain,
+**Recover saved order** retries the saved product/key and locks product selection.
+The draft is stored before sending. A failed storage read or unsupported Web Locks
+blocks creation rather than discarding the original request. Other tabs on the same
+origin share the saved operation and cannot send simultaneously. Use one origin
+consistently (127.0.0.1:8080); localhost and the direct API port have separate storage.

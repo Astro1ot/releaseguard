@@ -38,6 +38,8 @@ jobs:
       - run: docker compose up -d --build --wait --wait-timeout 240
       - name: Real PostgreSQL, Redis and Kafka business flow
         run: python scripts/integration.py
+      - name: Invalid and duplicate broker deliveries
+        run: python scripts/broker_contract.py
       - name: Redis failure and recovery drill
         run: python scripts/drill.py redis
       - name: Broker outage and order backlog drill

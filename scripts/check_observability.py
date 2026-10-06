@@ -22,7 +22,9 @@ if __name__ == '__main__':
     assert query['status'] == 'success' and float(query['data']['result'][0]['value'][1]) > 0
     groups = get('http://127.0.0.1:9090/api/v1/rules')['data']['groups']
     rules = [r for g in groups for r in g['rules']]
-    assert len(rules) == 5 and all(r['health'] == 'ok' for r in rules)
+    expected = {'ReleaseGuardUnavailable', 'ReleaseGuardErrors', 'ReleaseGuardDependency',
+                'ReleaseGuardLag', 'ReleaseGuardLatency', 'ReleaseGuardRejectedEvents'}
+    assert expected <= {r['name'] for r in rules} and all(r['health'] == 'ok' for r in rules)
     grafana = get('http://127.0.0.1:3001/api/datasources/uid/prometheus/health', 'admin:' + env['GRAFANA_PASSWORD'])
     assert grafana['status'] == 'OK'
     alertmanager = get('http://127.0.0.1:9093/api/v2/status')

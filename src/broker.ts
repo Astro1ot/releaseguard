@@ -1,6 +1,7 @@
 import { Kafka, Admin, Consumer, Producer, logLevel } from 'kafkajs';
 import { Pool } from 'pg';
-import { consumerLag, outbox } from './metrics';
+import { fulfill } from './fulfillment';
+import { consumerLag, outbox, rejectedEvents } from './metrics';
 
 export const topic = 'rg.orders';
 export const groupId = 'rg.fulfillment';
@@ -24,16 +25,9 @@ export class Broker {
     await this.producer.connect();
     await this.consumer.connect();
     await this.consumer.subscribe({ topic, fromBeginning: true });
-    await this.consumer.run({ eachMessage: async ({ message }) => {
-      const event = JSON.parse(message.value!.toString()) as { orderId: string };
-      // The business effect and deduplication record commit together.
-      const client = await this.pool.connect();
-      try {
-        await client.query('BEGIN');
-        const inserted = await client.query('INSERT INTO processed_events(event_id) VALUES($1) ON CONFLICT DO NOTHING RETURNING event_id', [message.key!.toString()]);
-        if (inserted.rowCount) await client.query("UPDATE orders SET status='completed' WHERE id=$1 AND status='pending'", [event.orderId]);
-        await client.query('COMMIT');
-      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+    await this.consumer.run({ eachMessage: async ({ topic, partition, message }) => {
+      const result = await fulfill(this.pool, {topic, partition, offset:message.offset}, message.key?.toString() ?? null, message.value?.toString() ?? null);
+      if (result === 'rejected') rejectedEvents.inc();
     } });
     this.online = true;
     this.timer = setInterval(() => { void this.flush(); }, 1000);

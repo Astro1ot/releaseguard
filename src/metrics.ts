@@ -9,3 +9,5 @@ export const outbox = new Gauge({ name: 'rg_outbox_pending', help: 'Unpublished 
 export const consumerLag = new Gauge({ name: 'rg_consumer_lag', help: 'Broker end offset minus consumer committed offset', registers: [registry] });
 export const cacheFallbacks = new Counter({ name: 'rg_cache_fallback_total', help: 'Cache calls using fallback', registers: [registry] });
 export const cacheLoads = new Counter({ name: 'rg_cache_load_total', help: 'Cache origin loads', registers: [registry] });
+
+export const rejectedEvents = new Counter({ name:'rg_events_rejected_total', help:'Rejected Kafka deliveries (redelivery may increment again)', registers:[registry] });

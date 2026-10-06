@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "demo": "node --env-file=.env.demo dist/main.js",
-    "test": "npm run build && node --test dist/tests/*.test.js",
+    "test": "npm run build && node --test dist/tests/*.test.js tests/*.test.mjs",
     "migrate": "node dist/migrate.js"
   },
   "dependencies": {

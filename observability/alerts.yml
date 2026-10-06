@@ -1,6 +1,13 @@
 groups:
   - name: releaseguard
     rules:
+      - alert: ReleaseGuardRejectedEvents
+        expr: increase(rg_events_rejected_total[5m]) > 0
+        labels: {severity: warning, owner: platform}
+        annotations:
+          summary: Kafka deliveries were quarantined
+          runbook: docs/runbooks/dependencies.md
+          action: Inspect rejected_events by topic, partition and offset; validate the producer before replaying.
       - alert: ReleaseGuardUnavailable
         expr: up{job="releaseguard"} == 0
         for: 30s

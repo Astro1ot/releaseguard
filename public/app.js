@@ -1,4 +1,5 @@
 'use strict';
+import {STORAGE_KEY, readOrder, confirmOrder, orderLock} from './order-recovery.mjs';
 const $ = id => document.getElementById(id);
 const names = { operational: 'Operational', degraded: 'Degraded', unknown: 'Observing' };
 function el(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
@@ -36,20 +37,65 @@ async function refresh() {
     for (const node of $('components').querySelectorAll('.signal-line')) node.className = 'signal-line unknown';
   } finally { refreshing = false; }
 }
-async function catalog() { try { const data = await json('/api/catalog'); $('product').replaceChildren(...data.products.map(p => { const option = el('option', p.name); option.value = p.id; return option; })); $('order').disabled = false; } catch { $('product').replaceChildren(el('option', 'Catalog unavailable — reload to retry')); } }
-let pendingKey;
-let pendingProduct;
-$('order').addEventListener('click', async () => {
-  const productId = $('product').value; if (!productId) return;
-  if (!pendingKey || pendingProduct !== productId) { pendingKey = crypto.randomUUID(); pendingProduct = productId; }
-  $('order').disabled = true;
+let orderBusy = false, catalogReady = false, savedOrder = null, storageBroken = false;
+function orderControls() {
+  const blocked = orderBusy || storageBroken || !navigator.locks;
+  $('order').disabled = blocked || (!catalogReady && savedOrder?.status !== 'unknown');
+  $('product').disabled = blocked || savedOrder?.status === 'unknown';
+  $('order').textContent = savedOrder?.status === 'unknown' ? 'Recover saved order' : 'Create test order ↗';
+  $('check-order').disabled = blocked || !savedOrder?.id;
+  $('saved-order').textContent = savedOrder ? `Saved: ${savedOrder.productId} · ${savedOrder.status} · key ${savedOrder.key}` : 'No saved order';
+}
+function syncOrder() {
+  try { savedOrder = readOrder(localStorage); storageBroken = false; }
+  catch (error) { storageBroken = true; $('order-result').textContent = error.message; }
+  orderControls();
+}
+async function catalog() {
   try {
-    const order = await json('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': pendingKey }, body: JSON.stringify({ productId }) });
-    $('order-result').textContent = `${order.status.toUpperCase()} · ${order.id}`; pendingKey = undefined;
-    if (order.status === 'pending') {
-      for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1000)); const current = await json(`/api/orders/${order.id}`); $('order-result').textContent = `${current.status.toUpperCase()} · ${current.id}`; if (current.status === 'completed') break; }
-    }
-  } catch (error) { $('order-result').textContent = `${error.message}. Retry reuses the same key if creation was not confirmed.`; }
-  finally { $('order').disabled = false; }
-});
+    const data = await json('/api/catalog');
+    $('product').replaceChildren(...data.products.map(p => { const option = el('option', p.name); option.value = p.id; return option; }));
+    catalogReady = data.products.length > 0;
+  } catch { $('product').replaceChildren(el('option', 'Catalog unavailable — reload to retry')); }
+  orderControls();
+}
+async function inspectOrder() {
+  const current = await json(`/api/orders/${savedOrder.id}`);
+  confirmOrder(savedOrder, current);
+  $('order-result').textContent = `${current.status.toUpperCase()} · ${current.id}` + (current.status === 'pending' ? ' · Still processing. Check status; no new order is needed.' : '');
+}
+async function orderAction(action) {
+  if (orderBusy) return;
+  orderBusy = true; orderControls();
+  try {
+    await orderLock(navigator.locks, async () => {
+      syncOrder();
+      if (!storageBroken) await action();
+    });
+  } catch (error) { $('order-result').textContent = error.message + ' Saved requests retain their original key.'; }
+  finally { orderBusy = false; syncOrder(); }
+}
+$('order').addEventListener('click', () => orderAction(async () => {
+  if (savedOrder?.status !== 'unknown') {
+    const productId = $('product').value;
+    if (!catalogReady || !productId) return;
+    const draft = {key:crypto.randomUUID(), productId, status:'unknown'};
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    savedOrder = draft;
+  }
+  orderControls();
+  $('order-result').textContent = 'Waiting for confirmation of the saved order…';
+  const result = await json('/api/orders', {method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':savedOrder.key},body:JSON.stringify({productId:savedOrder.productId})});
+  const confirmed = confirmOrder(savedOrder, result);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(confirmed));
+  savedOrder = confirmed;
+  $('order-result').textContent = `${result.status.toUpperCase()} · ${result.id}`;
+  if (result.status === 'pending') {
+    try { await inspectOrder(); }
+    catch { $('order-result').textContent = `Order ${result.id} was created. Status temporarily unavailable; use Check order status.`; }
+  }
+}));
+$('check-order').addEventListener('click', () => orderAction(async () => { if (savedOrder?.id) await inspectOrder(); }));
+window.addEventListener('storage', event => { if (!orderBusy && (event.key === STORAGE_KEY || event.key === null)) syncOrder(); });
+syncOrder();
 void refresh(); void catalog(); setInterval(refresh, 5000);

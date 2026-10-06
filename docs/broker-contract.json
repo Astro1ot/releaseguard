@@ -1,0 +1,6 @@
+{
+  "passed": true,
+  "invalidEvents": 2,
+  "duplicateDeliveries": 2,
+  "consumerAdvanced": true
+}

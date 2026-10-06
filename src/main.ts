@@ -5,7 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Request, Response, NextFunction } from 'express';
 import { resolve } from 'node:path';
 import { CatalogCache, createRedis } from './cache';
-import { Conflict, Product, Store } from './store';
+import { Conflict, Product, ProductNotFound, Store } from './store';
 import { StatusTracker } from './status';
 import { Broker } from './broker';
 import { dependencies, duration, registry, requests } from './metrics';
@@ -32,12 +32,10 @@ class AppController {
     if (!key || !/^[A-Za-z0-9_-]{8,100}$/.test(key)) throw new BadRequestException('Idempotency-Key must contain 8–100 letters, digits, _ or -');
     if (!body || typeof body !== 'object' || !('productId' in body) || typeof body.productId !== 'string' || Object.keys(body).some(k => k !== 'productId')) throw new BadRequestException('Expected { productId: string }');
     try {
-      const catalog = await cache.get(() => store.catalog());
-      if (!catalog.some(p => p.id === body.productId)) throw new NotFoundException('Product not found');
       return await store.create(body.productId, key);
     } catch (error) {
       if (error instanceof Conflict) throw new ConflictException(error.message);
-      if (error instanceof NotFoundException) throw error;
+      if (error instanceof ProductNotFound) throw new NotFoundException(error.message);
       throw new ServiceUnavailableException('Orders temporarily unavailable');
     }
   }

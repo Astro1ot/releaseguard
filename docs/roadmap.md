@@ -18,7 +18,7 @@ See verification.md for which parts have actually run in the build environment.
 
 1. Extend the successful GitHub-hosted verification with versioned release evidence and image publication.
 2. Move status aggregation into a separate service with durable incident storage, outside the application's failure domain.
-3. Separate API/publisher/consumer, add a consumer-pause/rebalance drill and poison-message handling.
+3. Separate API/publisher/consumer, add a consumer-pause/rebalance drill and independent worker lifecycles. Poison-message quarantine is now implemented and covered by a real Kafka regression.
 4. Add replicated persistent Kafka, database backup/restore rehearsal and retention jobs.
 5. Add end-to-end tracing and distinguish synthetic traffic from customer SLOs.
 6. Add a provider-specific Terraform/Deckhouse adapter, cert-manager DNS-01, expiry alerts and reviewed secret integration.

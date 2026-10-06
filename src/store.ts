@@ -9,6 +9,7 @@ export const products: Product[] = [
   { id: 'asset-03', name: 'Ambient sound library', category: 'Audio', price: 1800 },
 ];
 export class Conflict extends Error {}
+export class ProductNotFound extends Error {}
 export class Store {
   readonly pool?: Pool;
   private orders = new Map<string, Order>();
@@ -30,14 +31,16 @@ export class Store {
     if (!this.pool) {
       const existing = this.keys.get(key);
       if (existing) { const order = this.orders.get(existing)!; if (order.productId !== productId) throw new Conflict('Idempotency key reused with different payload'); return order; }
+      if (!products.some(p => p.id === productId)) throw new ProductNotFound('Product not found');
       const order = { id: randomUUID(), productId, status: 'completed', createdAt: new Date().toISOString() };
       this.orders.set(order.id, order); this.keys.set(key, order.id); return order;
     }
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      const inserted = await client.query('INSERT INTO orders(id, product_id, idempotency_key) VALUES($1,$2,$3) ON CONFLICT(idempotency_key) DO NOTHING RETURNING *', [randomUUID(), productId, key]);
+      const inserted = await client.query('INSERT INTO orders(id, product_id, idempotency_key) SELECT $1,id,$3 FROM products WHERE id=$2 ON CONFLICT(idempotency_key) DO NOTHING RETURNING *', [randomUUID(), productId, key]);
       const row = inserted.rows[0] ?? (await client.query('SELECT * FROM orders WHERE idempotency_key=$1', [key])).rows[0];
+      if (!row) throw new ProductNotFound('Product not found');
       if (row.product_id !== productId) throw new Conflict('Idempotency key reused with different payload');
       if (inserted.rowCount) await client.query('INSERT INTO outbox(id, order_id, payload) VALUES($1,$2,$3)', [randomUUID(), row.id, JSON.stringify({ orderId: row.id })]);
       await client.query('COMMIT');

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Store, Conflict } from '../store';
+import { Store, Conflict, ProductNotFound } from '../store';
 import { CatalogCache } from '../cache';
 import { StatusTracker } from '../status';
 
@@ -9,6 +9,14 @@ test('same idempotency key returns the same order under concurrency', async () =
   const orders = await Promise.all(Array.from({ length: 50 }, () => store.create('asset-01', 'same-key')));
   assert.equal(new Set(orders.map(o => o.id)).size, 1);
   await assert.rejects(() => store.create('asset-02', 'same-key'), Conflict);
+});
+
+test('store validates product itself and preserves conflict semantics without catalog cache', async () => {
+  const store=new Store(true);
+  await assert.rejects(store.create('missing','fresh-key'),ProductNotFound);
+  const order=await store.create('asset-01','existing-key');
+  await assert.rejects(store.create('missing','existing-key'),Conflict);
+  assert.equal((await store.create('asset-01','existing-key')).id,order.id);
 });
 test('cold cache coalesces concurrent origin reads', async () => {
   const cache = new CatalogCache<number>(); let calls = 0;
