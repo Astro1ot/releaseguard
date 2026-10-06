@@ -17,7 +17,7 @@ export class Store {
   constructor(readonly demo: boolean) {
     if (!demo) {
       if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required outside demo mode');
-      this.pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10, connectionTimeoutMillis: 1000, statement_timeout: 2000, idleTimeoutMillis: 10000 });
+      this.pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10, min:3, connectionTimeoutMillis: 3000, statement_timeout: 2000, idleTimeoutMillis: 60000 });
       this.pool.on('error', () => { console.warn(JSON.stringify({ level: 'warn', event: 'postgres_idle_connection_error' })); });
     }
   }

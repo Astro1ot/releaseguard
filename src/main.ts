@@ -36,6 +36,7 @@ class AppController {
     } catch (error) {
       if (error instanceof Conflict) throw new ConflictException(error.message);
       if (error instanceof ProductNotFound) throw new NotFoundException(error.message);
+      console.warn(JSON.stringify({event:'order_store_failure',type:error instanceof Error ? error.name : 'unknown',poolTotal:store.pool?.totalCount,poolIdle:store.pool?.idleCount,poolWaiting:store.pool?.waitingCount}));
       throw new ServiceUnavailableException('Orders temporarily unavailable');
     }
   }

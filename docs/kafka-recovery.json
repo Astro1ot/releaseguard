@@ -1,0 +1,23 @@
+{
+  "scenario": "kafka",
+  "passed": true,
+  "detectionSeconds": 15.96,
+  "totalSeconds": 45.78,
+  "orderDuringOutage": {
+    "passed": true,
+    "orderId": "3498fc27-d47d-414e-acd1-acb9627e4fe5",
+    "status": "pending",
+    "durationSeconds": 0.025
+  },
+  "orderAfterRecovery": {
+    "id": "3498fc27-d47d-414e-acd1-acb9627e4fe5",
+    "productId": "asset-01",
+    "status": "completed",
+    "createdAt": "2026-10-06T19:42:36.673Z"
+  },
+  "incident": {
+    "component": "Kafka",
+    "openedAt": "2026-10-06T19:42:35.592Z",
+    "message": "Kafka failed 3 consecutive checks"
+  }
+}

@@ -71,3 +71,12 @@ Single broker, no Kafka persistence, no backup automation, no HA database, no au
 Outbox and deduplication tables grow without automated retention; synthetic traffic is bounded. Current charts use pinned tags, not locked image digests. GHCR release images are commit-tagged; registry immutability must be enforced by policy in a production setup.
 
 Primary references: [Kubernetes probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/), [Helm upgrade](https://helm.sh/docs/helm/helm_upgrade/), [PostgreSQL CREATE INDEX](https://www.postgresql.org/docs/17/sql-createindex.html), [KafkaJS consuming](https://kafka.js.org/docs/consuming), [ioredis options](https://github.com/redis/ioredis).
+
+Transport retries are bounded (two retries, capped backoff and a three-second
+produce timeout). The producer uses at-least-once delivery; business deduplication
+remains in PostgreSQL. KafkaJS crash events mark consumer health unavailable until
+group join. When KafkaJS declines automatic restart, a single supervised retry
+runs after two seconds and stops on shutdown. Counters distinguish all crashes
+from supervised attempts. The PostgreSQL pool retains up to its minimum of three
+existing connections and has a three-second acquisition timeout; it is not an
+eagerly prefilled pool.

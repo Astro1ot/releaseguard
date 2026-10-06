@@ -40,6 +40,8 @@ jobs:
         run: python scripts/integration.py
       - name: Invalid and duplicate broker deliveries
         run: python scripts/broker_contract.py
+      - name: Consumer recovery after handler database failure
+        run: python scripts/consumer_recovery.py
       - name: Redis failure and recovery drill
         run: python scripts/drill.py redis
       - name: Broker outage and order backlog drill
@@ -52,6 +54,11 @@ jobs:
         run: docker compose exec -T prometheus promtool check rules /etc/prometheus/alerts.yml
       - name: Verify monitoring integration
         run: python scripts/check_observability.py
+      - name: Collect failure diagnostics
+        if: failure()
+        run: |
+          mkdir -p artifacts
+          docker compose logs --no-color --tail 300 api kafka > artifacts/diagnostics.log 2>&1
       - name: Save evidence
         if: always()
         uses: actions/upload-artifact@v4

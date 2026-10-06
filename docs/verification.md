@@ -66,3 +66,17 @@ observation timestamp. Remote CI for this change is a separate verification.
 - Six Prometheus rules passed promtool.
 - Browser: confirmed order survived reload; PostgreSQL was stopped, a new request remained unknown across reload with product selection disabled, then recovered using the same key after PostgreSQL restarted. The resulting order completed.
 - Browser persistence is scoped to one origin/profile. Use the same address consistently. No cross-device deduplication claim is made.
+
+## Broker recovery follow-up
+
+The earlier GitHub run fed5747 failed backlog recovery. Run c7f520d later passed
+all GitHub jobs, showing the issue was intermittent. Additional local outage
+work exposed connection-acquisition timeouts. Transport retries are now bounded,
+the PostgreSQL pool retains warm connections, consumer crashes are observable,
+and terminal crashes have supervised recovery. This does not prove a single
+root cause for the earlier remote failure.
+
+`python scripts/consumer_recovery.py` observed an actual handler crash under a
+processed_events lock and completion after release. `python scripts/drill.py kafka`
+then passed: detection 15.96s, total 45.78s, order pending during outage and completed
+after recovery. Malformed/duplicate delivery regression also passed again.

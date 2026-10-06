@@ -11,3 +11,5 @@ export const cacheFallbacks = new Counter({ name: 'rg_cache_fallback_total', hel
 export const cacheLoads = new Counter({ name: 'rg_cache_load_total', help: 'Cache origin loads', registers: [registry] });
 
 export const rejectedEvents = new Counter({ name:'rg_events_rejected_total', help:'Rejected Kafka deliveries (redelivery may increment again)', registers:[registry] });
+export const consumerRestarts = new Counter({name:'rg_consumer_restarts_total',help:'Supervised consumer restart attempts after a terminal crash',registers:[registry]});
+export const consumerCrashes = new Counter({name:'rg_consumer_crashes_total',help:'Consumer crashes including automatic library recovery',registers:[registry]});
