@@ -42,3 +42,17 @@ The corrected Kubernetes rehearsal is now part of normal push/PR verification, n
 ## Scope not claimed
 
 [GitHub-hosted verification](https://github.com/Astro1ot/releaseguard/actions/runs/37509813832) passed on 2026-10-06 for commit `cd4eb00`: application/chart tests, full Compose failure drills and the Kubernetes rollback rehearsal all succeeded. GHCR publication remains a separate manual action. NetworkPolicy enforcement, production TLS/DNS-01 automation, persistent independent incident storage, distributed tracing and HA/backup recovery are not claimed as verified features. See architecture.md and roadmap.md.
+
+## Status freshness regression, 2026-10-06
+
+Observations expire after 20 seconds. A stalled probe can no longer leave a
+green component indefinitely; returning probes need a new confirmation window.
+An unresolved incident survives a monitoring gap without duplication. The UI
+shows the oldest actual observation time, labels stale components, and avoids
+overlapping status requests. On feed failure it also removes old green signals.
+
+Validation: TypeScript build; 7 Node tests including expiry-boundary and incident
+continuity cases; 16 Python HTTP/release-gate/presenter tests; real Compose
+integration (fulfillment, concurrent idempotency, conflict and validation).
+API image rebuilt and healthy; browser confirmed operational status and actual
+observation timestamp. Remote CI for this change is a separate verification.

@@ -120,7 +120,7 @@ See [publication guide](docs/publishing.md), [demo script](docs/demo-script.md),
 | Consumer deduplication inside its DB transaction | At-least-once delivery does not repeat the business effect |
 | Local single-flight plus short cache TTL | Bounds origin load per pod when Redis is unavailable; not a distributed lock |
 | Additive schema changes before contract | Application rollback cannot reverse a destructive database migration |
-| Three-check status confirmation | Reduces flapping; history remains process-local in v0.1 |
+| Three-check status confirmation with 20-second expiry | Reduces flapping and rejects stale green observations; history remains process-local in v0.1 |
 
 ## Repository map
 

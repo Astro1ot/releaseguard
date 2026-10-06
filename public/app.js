@@ -3,21 +3,27 @@ const $ = id => document.getElementById(id);
 const names = { operational: 'Operational', degraded: 'Degraded', unknown: 'Observing' };
 function el(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
 async function json(path, options = {}) { const response = await fetch(path, { ...options, signal: AbortSignal.timeout(5000) }); const data = await response.json(); if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`); return data; }
+let refreshing = false;
 async function refresh() {
+  if (refreshing) return;
+  refreshing = true;
   try {
     const data = await json('/api/status');
     $('version').textContent = data.version; $('mode').textContent = data.mode;
     $('uptime').textContent = `${Math.floor(data.uptimeSeconds / 60)}m ${data.uptimeSeconds % 60}s`;
-    $('checked').textContent = new Date(data.checkedAt).toLocaleTimeString();
+    const observations = data.components.map(c => Date.parse(c.checkedAt)).filter(Number.isFinite);
+    $('checked').textContent = observations.length ? new Date(Math.min(...observations)).toLocaleTimeString() : 'No checks yet';
     $('banner').className = `status-banner ${data.state}`;
     $('symbol').textContent = data.state === 'operational' ? '✓' : data.state === 'degraded' ? '!' : '◌';
     $('overall').textContent = data.state === 'operational' ? 'Monitored services are operational' : data.state === 'degraded' ? 'A service needs attention' : 'Establishing the baseline';
     $('summary').textContent = data.state === 'operational' ? 'All enabled checks have passed their confirmation window.' : data.state === 'degraded' ? 'A dependency or business probe has failed consecutive checks.' : 'Three consecutive checks confirm a state change.';
-    $('live').textContent = '● LIVE';
+    const stale = data.components.some(c => c.stale);
+    $('live').textContent = stale ? 'STALE CHECKS' : '● LIVE';
+    if (stale) $('summary').textContent = 'Some checks are older than 20 seconds. Waiting for fresh observations.';
     $('components').replaceChildren(...data.components.map(c => {
       const card = el('div', undefined, 'component'); const top = el('div', undefined, 'component-top');
       top.append(el('span', c.name, 'component-name'), el('span', c.name === 'Catalog API' ? '↗' : '◫', 'component-icon'));
-      card.append(top, el('div', `● ${names[c.state]}`, `component-state ${c.state}`), el('div', undefined, `signal-line ${c.state}`)); return card;
+      card.append(top, el('div', `● ${c.stale ? 'Stale check' : names[c.state]}`, `component-state ${c.state}`), el('div', undefined, `signal-line ${c.state}`)); return card;
     }));
     $('disabled').textContent = data.disabled.length ? `Not monitored in this mode: ${data.disabled.join(', ')}. No simulated green checks.` : 'Dependency checks are distinct from Kubernetes readiness.';
     $('incident-count').textContent = `${data.incidents.length} events`;
@@ -26,7 +32,9 @@ async function refresh() {
     }) : [el('div', 'No incidents recorded in this process. The next confirmed failure will appear here.', 'empty')]));
   } catch {
     $('banner').className = 'status-banner unknown'; $('overall').textContent = 'Status feed unavailable'; $('summary').textContent = 'The last observation is stale. Refreshing automatically.'; $('live').textContent = 'STALE'; $('symbol').textContent = '?';
-  }
+    for (const node of $('components').querySelectorAll('.component-state')) { node.textContent = '● Stale observation'; node.className = 'component-state unknown'; }
+    for (const node of $('components').querySelectorAll('.signal-line')) node.className = 'signal-line unknown';
+  } finally { refreshing = false; }
 }
 async function catalog() { try { const data = await json('/api/catalog'); $('product').replaceChildren(...data.products.map(p => { const option = el('option', p.name); option.value = p.id; return option; })); $('order').disabled = false; } catch { $('product').replaceChildren(el('option', 'Catalog unavailable — reload to retry')); } }
 let pendingKey;

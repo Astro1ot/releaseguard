@@ -33,3 +33,28 @@ test('status debounces failure and recovery and closes the same incident', () =>
   assert.equal(tracker.snapshot().state, 'operational');
 });
 test('unknown is not presented as healthy', () => { const tracker = new StatusTracker(); tracker.record('PostgreSQL', true); assert.equal(tracker.snapshot().state, 'unknown'); });
+
+test('expired checks lose green status and require a fresh confirmation window', () => {
+  const tracker = new StatusTracker(3, 20000);
+  const at = (ms: number) => new Date(ms).toISOString();
+  for (const ms of [0, 5000, 10000]) tracker.record('Redis', true, at(ms));
+  assert.equal(tracker.snapshot(30000).state, 'operational');
+  assert.equal(tracker.snapshot(30001).state, 'unknown');
+  assert.equal(tracker.snapshot(30001).components[0].stale, true);
+  tracker.record('Redis', true, at(35000));
+  assert.equal(tracker.snapshot(35000).state, 'unknown');
+  tracker.record('Redis', true, at(40000));
+  tracker.record('Redis', true, at(45000));
+  assert.equal(tracker.snapshot(45000).state, 'operational');
+});
+
+test('a stale incident is neither duplicated nor silently resolved', () => {
+  const tracker = new StatusTracker(1, 20000);
+  tracker.record('Kafka', false, new Date(0).toISOString());
+  assert.equal(tracker.snapshot(21000).state, 'unknown');
+  tracker.record('Kafka', false, new Date(25000).toISOString());
+  assert.equal(tracker.snapshot(25000).incidents.length, 1);
+  assert.equal(tracker.snapshot(25000).incidents[0].resolvedAt, undefined);
+  tracker.record('Kafka', true, new Date(30000).toISOString());
+  assert.ok(tracker.snapshot(30000).incidents[0].resolvedAt);
+});
