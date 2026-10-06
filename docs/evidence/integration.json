@@ -1,0 +1,13 @@
+{
+  "mode": "infrastructure lab",
+  "smoke": {
+    "passed": true,
+    "orderId": "8df02185-75df-455c-a426-56fc5ba0b380",
+    "status": "completed",
+    "durationSeconds": 1.016
+  },
+  "concurrentRequests": 40,
+  "uniqueOrders": 1,
+  "conflictStatus": 409,
+  "unknownFieldStatus": 400
+}

@@ -1,0 +1,43 @@
+groups:
+  - name: releaseguard
+    rules:
+      - alert: ReleaseGuardUnavailable
+        expr: up{job="releaseguard"} == 0
+        for: 30s
+        labels: {severity: critical, owner: platform}
+        annotations:
+          summary: API metrics endpoint is unreachable
+          runbook: docs/runbooks/release.md
+          action: Check pod events and last release; confirm impact with a synthetic request.
+      - alert: ReleaseGuardErrors
+        expr: sum(rate(rg_http_requests_total{status=~"5.."}[2m])) / clamp_min(sum(rate(rg_http_requests_total[2m])), 0.001) > 0.05
+        for: 1m
+        labels: {severity: critical, owner: platform}
+        annotations:
+          summary: Business API error ratio exceeds 5 percent
+          runbook: docs/runbooks/release.md
+          action: Compare release revision with error onset; run smoke before considering rollback.
+      - alert: ReleaseGuardDependency
+        expr: rg_dependency_up == 0
+        for: 30s
+        labels: {severity: warning, owner: platform}
+        annotations:
+          summary: 'Dependency {{ $labels.component }} is unavailable'
+          runbook: docs/runbooks/dependencies.md
+          action: Check the component and fallback load; do not restart all API replicas.
+      - alert: ReleaseGuardLag
+        expr: rg_consumer_lag > 20 or rg_outbox_pending > 20
+        for: 1m
+        labels: {severity: warning, owner: platform}
+        annotations:
+          summary: Order processing is falling behind
+          runbook: docs/runbooks/dependencies.md
+          action: Check consumer membership, broker availability and DB locks before scaling.
+      - alert: ReleaseGuardLatency
+        expr: histogram_quantile(0.95, sum by(le) (rate(rg_http_duration_seconds_bucket[5m]))) > 0.5
+        for: 2m
+        labels: {severity: warning, owner: platform}
+        annotations:
+          summary: Business API p95 exceeds 500ms
+          runbook: docs/runbooks/postgres.md
+          action: Compare DB waits, origin load and traffic rate; identify the constrained resource.

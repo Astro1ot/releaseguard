@@ -1,0 +1,30 @@
+- name: Deploy a reviewed ReleaseGuard release
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check required inputs
+      ansible.builtin.assert:
+        that:
+          - rg_repo is defined
+          - rg_context is defined
+          - rg_namespace is defined
+          - rg_url is defined
+          - rg_image_tag is defined
+    - name: Run the release gate
+      ansible.builtin.command:
+        argv:
+          - python3
+          - '{{ rg_repo }}/cli/rg.py'
+          - deploy
+          - --context
+          - '{{ rg_context }}'
+          - --namespace
+          - '{{ rg_namespace }}'
+          - --environment
+          - staging
+          - --url
+          - '{{ rg_url }}'
+          - --image-tag
+          - '{{ rg_image_tag }}'
+      changed_when: true

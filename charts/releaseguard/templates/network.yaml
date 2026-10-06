@@ -1,0 +1,29 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-private
+spec:
+  podSelector:
+    matchLabels: {app: {{ .Release.Name }}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports: [{port: {{ .Values.service.port }}, protocol: TCP}]
+{{- if .Values.lab.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-dependencies
+spec:
+  podSelector:
+    matchLabels: {releaseguard/dependency: {{ .Release.Name }}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: {{ .Release.Name }}}}
+        - podSelector: {matchLabels: {releaseguard/dependency: {{ .Release.Name }}}}
+{{- end }}
+{{- end }}

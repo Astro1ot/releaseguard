@@ -1,0 +1,17 @@
+{
+  "release": "releaseguard",
+  "namespace": "rg-local",
+  "context": "kind-releaseguard",
+  "previousRevision": 2,
+  "startedAt": "2026-10-06T18:03:51Z",
+  "result": "failed",
+  "failureType": "HTTPError",
+  "recovery": {
+    "passed": true,
+    "orderId": "09109413-743e-4011-b53b-f1d6012c4c5f",
+    "status": "completed",
+    "durationSeconds": 2.112
+  },
+  "rollback": "verified",
+  "durationSeconds": 8.362
+}

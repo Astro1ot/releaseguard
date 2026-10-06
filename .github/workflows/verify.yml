@@ -1,0 +1,12 @@
+name: Verify
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    uses: ./.github/workflows/reusable-verify.yml
+  kubernetes:
+    uses: ./.github/workflows/kubernetes.yml

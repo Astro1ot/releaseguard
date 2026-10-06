@@ -1,0 +1,8 @@
+{
+  "scenario": "migration",
+  "passed": true,
+  "blockedDdlSeconds": 0.9878652000043076,
+  "writes": 150,
+  "writeP95Seconds": 0.0536260000008042,
+  "invalidIndexes": 0
+}

@@ -1,0 +1,59 @@
+name: Reusable verification
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  unit-and-chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22', cache: npm}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: azure/setup-helm@v4.3.0
+        with: {version: v3.19.0}
+      - run: npm ci
+      - run: npm test
+      - run: python -m unittest discover -s tests -v
+      - run: pip install -r requirements-ansible.txt
+      - run: python tests/ansible_integration.py
+      - run: python scripts/check_migrations.py
+      - run: helm lint charts/releaseguard --strict -f environments/local.yaml
+      - run: helm template releaseguard charts/releaseguard -f environments/staging.yaml > rendered.yaml
+      - name: Reject unknown chart values
+        run: |
+          if helm template releaseguard charts/releaseguard --set replicaCout=3; then
+            echo 'Schema accepted a misspelled key'; exit 1
+          fi
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python cli/rg.py init-env
+      - run: docker compose up -d --build --wait --wait-timeout 240
+      - name: Real PostgreSQL, Redis and Kafka business flow
+        run: python scripts/integration.py
+      - name: Redis failure and recovery drill
+        run: python scripts/drill.py redis
+      - name: Broker outage and order backlog drill
+        run: python scripts/drill.py kafka
+      - name: Edge rate limit
+        run: python scripts/drill.py rate-limit
+      - name: PostgreSQL migration under writes
+        run: python scripts/migration_drill.py
+      - name: Verify Prometheus rules
+        run: docker compose exec -T prometheus promtool check rules /etc/prometheus/alerts.yml
+      - name: Verify monitoring integration
+        run: python scripts/check_observability.py
+      - name: Save evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: {name: integration-evidence, path: artifacts/, if-no-files-found: ignore}
+      - name: Shut down isolated lab
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.demo
+!.env.example
+.secrets/
+artifacts/
+*.log
+*.tgz
+.tools/

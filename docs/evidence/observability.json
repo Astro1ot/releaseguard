@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "prometheusTarget": "up",
+  "ruleCount": 5,
+  "ruleHealth": "ok",
+  "grafanaDatasource": "OK",
+  "alertmanager": "reachable"
+}

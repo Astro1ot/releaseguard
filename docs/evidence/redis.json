@@ -1,0 +1,17 @@
+{
+  "scenario": "redis",
+  "passed": true,
+  "detectionSeconds": 14.91,
+  "totalSeconds": 34.7,
+  "order": {
+    "passed": true,
+    "orderId": "5b1fa673-18c0-4ae7-b696-20237814bb2f",
+    "status": "completed",
+    "durationSeconds": 3.052
+  },
+  "incident": {
+    "component": "Redis",
+    "openedAt": "2026-10-06T17:46:35.272Z",
+    "message": "Redis failed 3 consecutive checks"
+  }
+}

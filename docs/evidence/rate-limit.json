@@ -1,0 +1,14 @@
+{
+  "scenario": "rate-limit",
+  "passed": true,
+  "responses": {
+    "200": 23,
+    "429": 177
+  },
+  "privatePaths": {
+    "/metrics": 404,
+    "/METRICS/": 404,
+    "/health/ready": 404,
+    "/HEALTH/live": 404
+  }
+}

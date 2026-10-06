@@ -1,0 +1,11 @@
+{
+  "uid":"releaseguard", "title":"ReleaseGuard · Delivery signals", "schemaVersion":39,
+  "version":1, "refresh":"5s", "time":{"from":"now-15m","to":"now"}, "tags":["releaseguard","lab"],
+  "panels":[
+    {"id":1,"title":"Business requests / second","type":"timeseries","datasource":{"uid":"prometheus","type":"prometheus"},"gridPos":{"x":0,"y":0,"w":12,"h":8},"targets":[{"expr":"sum by(status) (rate(rg_http_requests_total[1m]))","legendFormat":"{{status}}"}]},
+    {"id":2,"title":"p95 latency (seconds)","type":"timeseries","datasource":{"uid":"prometheus","type":"prometheus"},"gridPos":{"x":12,"y":0,"w":12,"h":8},"targets":[{"expr":"histogram_quantile(0.95, sum by(le) (rate(rg_http_duration_seconds_bucket[2m])))","legendFormat":"p95"}]},
+    {"id":3,"title":"Dependency probes (1 = up)","type":"timeseries","datasource":{"uid":"prometheus","type":"prometheus"},"gridPos":{"x":0,"y":8,"w":12,"h":8},"targets":[{"expr":"rg_dependency_up","legendFormat":"{{component}}"}]},
+    {"id":4,"title":"Order delivery backlog","type":"timeseries","datasource":{"uid":"prometheus","type":"prometheus"},"gridPos":{"x":12,"y":8,"w":12,"h":8},"targets":[{"expr":"rg_consumer_lag","legendFormat":"Consumer lag"},{"expr":"rg_outbox_pending","legendFormat":"Outbox pending"}]},
+    {"id":5,"title":"Cache origin requests / second","type":"timeseries","datasource":{"uid":"prometheus","type":"prometheus"},"gridPos":{"x":0,"y":16,"w":12,"h":8},"targets":[{"expr":"rate(rg_cache_load_total[1m])","legendFormat":"Origin"},{"expr":"rate(rg_cache_fallback_total[1m])","legendFormat":"Fallback"}]}
+  ]
+}

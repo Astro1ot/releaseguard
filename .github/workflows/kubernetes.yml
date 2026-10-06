@@ -1,0 +1,28 @@
+name: Kubernetes rollback rehearsal
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: azure/setup-helm@v4.3.0
+        with: {version: v3.19.0}
+      - uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: releaseguard
+          config: infra/kind.yaml
+          version: v0.30.0
+      - name: Prepare the same lab used by the local presentation console
+        run: python scripts/setup_kube.py
+      - name: Rehearse failed release and verify recovery
+        run: python scripts/kube_rehearsal.py --context kind-releaseguard --namespace rg-local
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: {name: release-evidence, path: artifacts/, if-no-files-found: ignore}

@@ -1,0 +1,13 @@
+{
+  "mode": "demo / in-memory",
+  "smoke": {
+    "passed": true,
+    "orderId": "e61b7cc6-3fc8-4a96-aca5-f0f5f811e100",
+    "status": "completed",
+    "durationSeconds": 0.031
+  },
+  "concurrentRequests": 40,
+  "uniqueOrders": 1,
+  "conflictStatus": 409,
+  "unknownFieldStatus": 400
+}

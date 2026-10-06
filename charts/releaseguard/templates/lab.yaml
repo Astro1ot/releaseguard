@@ -1,0 +1,114 @@
+{{- if .Values.lab.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-postgres
+spec:
+  serviceName: {{ .Release.Name }}-postgres
+  replicas: 1
+  selector:
+    matchLabels: {app: '{{ .Release.Name }}-postgres'}
+  template:
+    metadata:
+      labels: {app: '{{ .Release.Name }}-postgres', releaseguard/dependency: {{ .Release.Name }}}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: postgres
+          image: postgres:17.6-bookworm
+          env:
+            - {name: POSTGRES_DB, value: releaseguard}
+            - {name: POSTGRES_USER, value: releaseguard}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ .Values.app.secretName }}, key: POSTGRES_PASSWORD}
+          ports: [{containerPort: 5432}]
+          readinessProbe: {exec: {command: [pg_isready, -U, releaseguard, -d, releaseguard]}, periodSeconds: 3}
+          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: '1', memory: 512Mi}}
+          volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: {{ .Values.lab.storageSize }}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-postgres
+spec:
+  selector: {app: '{{ .Release.Name }}-postgres'}
+  ports: [{port: 5432}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: '{{ .Release.Name }}-redis'}
+  template:
+    metadata:
+      labels: {app: '{{ .Release.Name }}-redis', releaseguard/dependency: {{ .Release.Name }}}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: redis
+          image: redis:7.4.5-alpine
+          args: [--maxmemory, 128mb, --maxmemory-policy, allkeys-lru]
+          ports: [{containerPort: 6379}]
+          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: 500m, memory: 192Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redis
+spec:
+  selector: {app: '{{ .Release.Name }}-redis'}
+  ports: [{port: 6379}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-kafka
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: '{{ .Release.Name }}-kafka'}
+  template:
+    metadata:
+      labels: {app: '{{ .Release.Name }}-kafka', releaseguard/dependency: {{ .Release.Name }}}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: kafka
+          image: apache/kafka:3.9.1
+          ports: [{containerPort: 9092}, {containerPort: 9093}]
+          env:
+            - {name: KAFKA_NODE_ID, value: '1'}
+            - {name: KAFKA_PROCESS_ROLES, value: 'broker,controller'}
+            - {name: KAFKA_LISTENERS, value: 'PLAINTEXT://:9092,CONTROLLER://:9093'}
+            - {name: KAFKA_ADVERTISED_LISTENERS, value: 'PLAINTEXT://{{ .Release.Name }}-kafka:9092'}
+            - {name: KAFKA_CONTROLLER_LISTENER_NAMES, value: CONTROLLER}
+            - {name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'}
+            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: '1@localhost:9093'}
+            - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: '1'}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: '1'}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: '1'}
+            - {name: KAFKA_HEAP_OPTS, value: '-Xms256m -Xmx512m'}
+          resources: {requests: {cpu: 200m, memory: 768Mi}, limits: {cpu: '2', memory: 1536Mi}}
+          startupProbe: {tcpSocket: {port: 9092}, periodSeconds: 5, failureThreshold: 30}
+          readinessProbe: {tcpSocket: {port: 9092}, periodSeconds: 3}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-kafka
+spec:
+  selector: {app: '{{ .Release.Name }}-kafka'}
+  ports: [{name: broker, port: 9092, targetPort: 9092}]
+{{- end }}

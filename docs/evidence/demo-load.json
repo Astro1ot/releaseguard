@@ -1,0 +1,17 @@
+{
+  "url": "http://127.0.0.1:3000/api/catalog",
+  "requests": 200,
+  "concurrency": 10,
+  "durationSeconds": 0.2837601999999606,
+  "rps": 704.8204787000706,
+  "statusCounts": {
+    "200": 200
+  },
+  "latencyMs": {
+    "p50": 5.479800001921831,
+    "p95": 28.4581999949296,
+    "max": 149.98560000094585
+  },
+  "mode": "demo / in-memory",
+  "environment": "Windows; Node.js 24.19.0; local synthetic catalog; short smoke load, not a capacity test"
+}

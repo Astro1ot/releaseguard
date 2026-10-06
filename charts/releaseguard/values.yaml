@@ -1,0 +1,24 @@
+replicaCount: 2
+image:
+  repository: releaseguard
+  tag: local
+  pullPolicy: IfNotPresent
+app:
+  version: local
+  fault: none
+  secretName: releaseguard-secrets
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: '1', memory: 384Mi}
+service:
+  port: 3000
+ingress:
+  enabled: false
+  className: nginx
+  host: releaseguard.example.test
+  tlsSecret: ''
+lab:
+  enabled: false
+  storageSize: 1Gi
+networkPolicy:
+  enabled: true

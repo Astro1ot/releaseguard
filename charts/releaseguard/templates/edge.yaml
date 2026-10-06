@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-edge
+data:
+  default.conf: |
+    limit_req_zone $binary_remote_addr zone=per_ip:10m rate=10r/s;
+    server {
+      listen 8080;
+      server_tokens off;
+      limit_req_status 429;
+      location ~* ^/(metrics|health)(/|$) { return 404; }
+      location ~* ^/api/ {
+        limit_req zone=per_ip burst=20 nodelay;
+        proxy_pass http://{{ .Release.Name }}:{{ .Values.service.port }};
+        proxy_connect_timeout 2s;
+        proxy_read_timeout 10s;
+      }
+      location / { proxy_pass http://{{ .Release.Name }}:{{ .Values.service.port }}; }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-edge
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: '{{ .Release.Name }}-edge'}
+  template:
+    metadata:
+      labels: {app: '{{ .Release.Name }}-edge'}
+      annotations:
+        releaseguard/config: {{ printf "%s:%v" .Release.Name .Values.service.port | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, fsGroup: 101, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: edge
+          image: nginxinc/nginx-unprivileged:1.28-alpine
+          ports: [{name: http, containerPort: 8080}]
+          resources: {requests: {cpu: 50m, memory: 32Mi}, limits: {cpu: 500m, memory: 128Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          readinessProbe: {tcpSocket: {port: http}, periodSeconds: 3}
+          volumeMounts:
+            - {name: config, mountPath: /etc/nginx/conf.d, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap: {name: '{{ .Release.Name }}-edge'}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-edge
+spec:
+  selector: {app: '{{ .Release.Name }}-edge'}
+  ports: [{name: http, port: 8080, targetPort: http}]
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tlsSecret }}
+  tls:
+    - hosts: [{{ .Values.ingress.host | quote }}]
+      secretName: {{ .Values.ingress.tlsSecret }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-edge
+                port: {number: 8080}
+{{- end }}

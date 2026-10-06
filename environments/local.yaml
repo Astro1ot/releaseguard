@@ -1,0 +1,4 @@
+replicaCount: 1
+image: {repository: releaseguard, tag: local, pullPolicy: IfNotPresent}
+app: {version: local, fault: none, secretName: releaseguard-secrets}
+lab: {enabled: true, storageSize: 1Gi}
