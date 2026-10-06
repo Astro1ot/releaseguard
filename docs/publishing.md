@@ -2,6 +2,10 @@
 
 ## GitHub
 
+Published repository: https://github.com/Astro1ot/releaseguard
+
+Verification runs: https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml
+
 Create an empty repository under your account, then from this project directory:
 
 ```sh
@@ -17,7 +21,7 @@ Inspect staged files before committing. `.env`, `.secrets`, node_modules, build 
 
 The `Verify` workflow will run both the real Compose lab and the Kubernetes rollback rehearsal. Keep the evidence artifacts and link the successful workflow runs from README. Local run evidence is already included; do not present it as a GitHub-hosted CI run until those workflows finish.
 
-Run `Publish image` manually when ready. It needs the repository's normal GitHub Actions package-write permission and publishes `ghcr.io/OWNER/REPOSITORY:COMMIT_SHA`. Repository/organization settings may require making the package readable for your deployment. No public repository or account was created automatically as part of generating this project.
+Run `Publish image` manually when ready. It needs the repository's normal GitHub Actions package-write permission and publishes `ghcr.io/OWNER/REPOSITORY:COMMIT_SHA`. Repository/organization settings may require making the package readable for your deployment.
 
 Suggested description: **A Kubernetes release engineering lab with verified rollback, failure drills, a transactional outbox and observable recovery.**
 

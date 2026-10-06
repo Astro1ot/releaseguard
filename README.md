@@ -1,5 +1,7 @@
 # ReleaseGuard
 
+[![Verify](https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml/badge.svg)](https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml)
+
 **Safe releases. Observable failures. Rehearsed recovery.**
 
 ReleaseGuard is an open DevOps portfolio lab built around a small digital goods marketplace. It demonstrates the path from a container image to a verified release, including business smoke tests, Helm rollback, PostgreSQL migrations, a transactional outbox, Redis fallback and automated status signals.

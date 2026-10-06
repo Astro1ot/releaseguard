@@ -41,4 +41,4 @@ The corrected Kubernetes rehearsal is now part of normal push/PR verification, n
 
 ## Scope not claimed
 
-GitHub-hosted CI and GHCR publication are separate from these local executions. NetworkPolicy enforcement, production TLS/DNS-01 automation, persistent independent incident storage, distributed tracing and HA/backup recovery are not claimed as verified features. See architecture.md and roadmap.md.
+[GitHub-hosted verification](https://github.com/Astro1ot/releaseguard/actions/runs/37509813832) passed on 2026-10-06 for commit `cd4eb00`: application/chart tests, full Compose failure drills and the Kubernetes rollback rehearsal all succeeded. GHCR publication remains a separate manual action. NetworkPolicy enforcement, production TLS/DNS-01 automation, persistent independent incident storage, distributed tracing and HA/backup recovery are not claimed as verified features. See architecture.md and roadmap.md.
