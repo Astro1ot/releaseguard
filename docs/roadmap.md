@@ -7,7 +7,7 @@
 - Live status UI with confirmed state transitions and an explicit demo mode.
 - Helm chart, strict schema, local/staging overlays and lab dependencies.
 - Python plan/deploy/smoke/bootstrap commands with verified rollback and evidence.
-- Reusable GitHub workflow, Compose drills and manual Kubernetes rehearsal.
+- Reusable GitHub workflow, Compose drills and Kubernetes rehearsal on pushes and PRs.
 - Prometheus/Grafana/Alertmanager configuration; runbooks.
 - Additive migrations, concurrent indexes, checksums and migration review gate.
 - Optional ansible-runner wrapper and Vault API example.
@@ -16,7 +16,7 @@ See verification.md for which parts have actually run in the build environment.
 
 ## Next priorities
 
-1. Publish the source and repeat the locally verified scenarios in GitHub-hosted CI; attach the workflow evidence.
+1. Extend the successful GitHub-hosted verification with versioned release evidence and image publication.
 2. Move status aggregation into a separate service with durable incident storage, outside the application's failure domain.
 3. Separate API/publisher/consumer, add a consumer-pause/rebalance drill and poison-message handling.
 4. Add replicated persistent Kafka, database backup/restore rehearsal and retention jobs.
