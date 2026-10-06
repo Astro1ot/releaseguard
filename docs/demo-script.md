@@ -20,3 +20,15 @@ The draft is stored before sending. A failed storage read or unsupported Web Loc
 blocks creation rather than discarding the original request. Other tabs on the same
 origin share the saved operation and cannot send simultaneously. Use one origin
 consistently (127.0.0.1:8080); localhost and the direct API port have separate storage.
+
+## Короткий маршрут из панели
+
+Откройте http://127.0.0.1:8877 и после запуска стенда нажмите «Запустить три
+проверки подряд». Расскажите о транзакционном outbox, затем покажите защиту от
+повторов и карантин повреждённых событий. Завершите восстановлением обработчика
+после тайм-аута БД. Итог появляется в журнале и в истории; кнопка скачивания
+сохраняет JSON с датой формирования и завершёнными проверками.
+
+Отдельные карточки позволяют показать только карантин или восстановление.
+История включает предыдущие запуски; дата записи не означает текущую исправность
+стенда. Если панель обновлялась, перезапустите её только после завершения сценария.

@@ -80,3 +80,17 @@ root cause for the earlier remote failure.
 processed_events lock and completion after release. `python scripts/drill.py kafka`
 then passed: detection 15.96s, total 45.78s, order pending during outage and completed
 after recovery. Malformed/duplicate delivery regression also passed again.
+
+## Presentation audit
+
+Presenter regression checks now cover invalid JSON shapes/duplicate keys, report
+redaction, a second-command launch failure after a successful first command, and
+history write failure. A command-launch exception cannot inherit exit code zero
+from the previous command. History is replaced atomically and new entries carry
+UTC timestamps. Frontend polls have deadlines and cannot overlap; stale states
+disable command buttons.
+
+The new `proof-tour` was started through the browser panel and passed all three
+real checks: integration, malformed/duplicate Kafka deliveries, and consumer
+recovery after database handler failure. See presentation-report.json for the
+exported historical result. The report is not a current health guarantee.
