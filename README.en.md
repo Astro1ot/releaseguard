@@ -1,6 +1,6 @@
 # ReleaseGuard
 
-English · [Русский](README.ru.md)
+English · [Русский](README.md)
 
 [![Verify](https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml/badge.svg)](https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml)
 
