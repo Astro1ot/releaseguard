@@ -21,7 +21,7 @@ Prometheus ◄── метрики API      Alertmanager ◄── правил
 
 ## Быстрый старт, демо
 
-Нужны Node.js 22+ и Python 3.11+.
+Нужны Node.js 22+ и Python 3.11+
 
 ```sh
 npm ci
