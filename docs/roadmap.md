@@ -1,6 +1,6 @@
 # Scope and next steps
 
-## v0.1 — implemented
+## v0.1, implemented
 
 - NestJS catalog/orders API, idempotency, PostgreSQL transactional outbox and Kafka consumer deduplication.
 - Redis deadlines, disabled offline queue, jitter and per-process single-flight fallback.
