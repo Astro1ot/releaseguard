@@ -45,7 +45,7 @@ python -m unittest discover -s tests -v
 
 ## Полный стенд
 
-Нужен Docker с Compose v2 (около 4–6 ГБ памяти). На Windows можно дважды нажать `Start-Lab.cmd`.
+Нужен Docker с Compose v2 (около 4-6 ГБ памяти). На Windows можно дважды нажать `Start-Lab.cmd`.
 
 ```sh
 python cli/rg.py init-env
