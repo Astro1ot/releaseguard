@@ -1,5 +1,7 @@
 # ReleaseGuard
 
+English · [Русский](README.ru.md)
+
 [![Verify](https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml/badge.svg)](https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml)
 
 **Safe releases. Observable failures. Rehearsed recovery.**
@@ -7,6 +9,21 @@
 ReleaseGuard is an open DevOps portfolio lab built around a small digital goods marketplace. It demonstrates the path from a container image to a verified release, including business smoke tests, Helm rollback, PostgreSQL migrations, a transactional outbox, Redis fallback and automated status signals.
 
 This is a lab with explicit boundaries, not a claim of production experience or production readiness. There are no payments, customer accounts, real digital goods or personal data.
+
+## Key results (lab, synthetic data)
+
+| Check | Measured result |
+|---|---|
+| Bad release rolled back to the recorded Helm revision | 8.36 s total, recovery check 2.11 s |
+| DDL under a deliberately held lock (`lock_timeout`) | fails in about 0.99 s |
+| 150 concurrent writes during an online index build | p95 about 54 ms, 0 invalid indexes |
+| 40 duplicate order requests | exactly 1 order |
+| Redis outage | detected in 14.91 s, catalog served from PostgreSQL |
+| Edge rate limit (200 requests) | 23 x 200, 177 x 429 |
+
+Numbers come from the JSON evidence in [docs/verification.md](docs/verification.md). They describe one lab run, not capacity or production SLOs.
+
+**Stack:** NestJS 11 / TypeScript, PostgreSQL 17, Redis 7, Kafka 3.9 (KRaft), Docker Compose, Helm 3.19, kind, Prometheus, Alertmanager, Grafana, GitHub Actions, Python CLI, Ansible.
 
 ## Guided demonstration
 
