@@ -1,6 +1,8 @@
 # ReleaseGuard
 
-[English](README.md) · Русский
+[English](README.en.md) · Русский
+
+[![Verify](https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml/badge.svg)](https://github.com/Astro1ot/releaseguard/actions/workflows/verify.yml)
 
 Учебный DevOps-стенд вокруг небольшого магазина цифровых товаров. Показывает путь от образа до проверенного релиза: бизнес-проверка после выката, откат Helm, миграции PostgreSQL, transactional outbox, запасной путь при отказе Redis и алерты.
 
