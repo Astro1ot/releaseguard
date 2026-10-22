@@ -1,5 +1,6 @@
-// In-mesh traffic generator for canary and pod-failure drills. Its Envoy sidecar applies the
-// VirtualService split, so each response is attributed to stable or canary by X-App-Version.
+// Traffic generator for canary and pod-failure drills, one per entry point. Requests to the
+// releaseguard Service pass the ambient waypoint, which applies the HTTPRoute split; each response
+// is attributed to stable or canary by X-App-Version.
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';

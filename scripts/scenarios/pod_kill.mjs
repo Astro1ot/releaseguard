@@ -1,6 +1,7 @@
-// An API pod is force-deleted (no graceful shutdown) while in-mesh traffic continues.
-// Pass: client-observed error ratio and recovery time stay within deploy/kind/scenarios.json.
-import { THRESHOLDS, args, check, diffCounts, kjson, kubectl, loadgenStats, now, promQuery, rolloutState, saveScenarioMetrics, scenario, sleep, waitFor } from './lib.mjs';
+// An API pod is force-deleted (no graceful shutdown) while traffic continues from both entry points
+// (in-mesh client and ingress gateway). Pass: client-observed error ratio per entry and recovery time
+// stay within deploy/kind/scenarios.json.
+import { THRESHOLDS, args, check, diffEntries, entryStats, kjson, kubectl, now, promQuery, rolloutState, saveScenarioMetrics, scenario, sleep, waitFor } from './lib.mjs';
 
 const opts = args();
 const ns = opts.namespace ?? 'rg-canary';
@@ -17,7 +18,7 @@ await scenario('pod-kill', limits, async report => {
   report.measured.replicas = initial.replicas;
   report.measured.victim = victim;
 
-  const before = loadgenStats(ns);
+  const before = entryStats(ns);
   const killedAt = Date.now();
   kubectl(ns, ['delete', 'pod', victim, '--grace-period=0', '--force', '--wait=false']);
   report.timeline.push({ at: now(), event: 'pod force-deleted', pod: victim });
@@ -32,14 +33,16 @@ await scenario('pod-kill', limits, async report => {
 
   const remaining = limits.observationSeconds * 1000 - (Date.now() - killedAt);
   if (remaining > 0) await sleep(remaining);
-  const window = diffCounts(before, loadgenStats(ns));
+  const windows = diffEntries(before, entryStats(ns));
   report.measured.recoverySeconds = Math.round(recoverySeconds * 10) / 10;
-  report.measured.clientTraffic = window;
+  report.measured.clientTraffic = windows;
   const seconds = Math.ceil((Date.now() - killedAt) / 1000) + 5;
-  report.measured.server5xxInWindow = promQuery(`sum(increase(istio_requests_total{reporter="source",destination_service_namespace="${ns}",response_code=~"5.."}[${seconds}s])) or vector(0)`);
+  report.measured.server5xxInWindow = promQuery(`sum(increase(istio_requests_total{reporter="waypoint",destination_service_namespace="${ns}",response_code=~"5.."}[${seconds}s])) or vector(0)`);
 
-  check(report, 'enough client requests observed', `>= ${limits.minRequests}`, window.total, window.total >= limits.minRequests);
-  check(report, 'client error ratio during pod failure', `<= ${limits.maxClientErrorRatio}`, window.errorRatio, window.errorRatio !== null && window.errorRatio <= limits.maxClientErrorRatio);
+  for (const [entry, window] of Object.entries(windows)) {
+    check(report, `${entry} entry: enough client requests observed`, `>= ${limits.minRequests}`, window.total, window.total >= limits.minRequests);
+    check(report, `${entry} entry: client error ratio during pod failure`, `<= ${limits.maxClientErrorRatio}`, window.errorRatio, window.errorRatio !== null && window.errorRatio <= limits.maxClientErrorRatio);
+  }
   check(report, 'replacement pod ready in time', `<= ${limits.maxRecoverySeconds}s`, report.measured.recoverySeconds, recoverySeconds <= limits.maxRecoverySeconds);
   saveScenarioMetrics('pod-kill', ns, startedAt);
 });

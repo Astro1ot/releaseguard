@@ -57,6 +57,7 @@
   ],
   "kindScenarios": [
     "stand-setup",
+    "ambient-metrics",
     "canary-promote",
     "canary-errors",
     "canary-latency",

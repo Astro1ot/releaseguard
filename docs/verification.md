@@ -111,3 +111,24 @@ Verified locally:
 - `scripts/llm/review.mjs` without an API key produces the "unavailable" report and exits 0.
 
 Not executed in this environment: the kind stand (Istio, Argo Rollouts, Prometheus) and all kind scenarios, the Compose regression, the GitLab pipeline itself, and the live LLM review/evaluation. No measured values are claimed for them; see `artifacts/report.md` after a run.
+
+## Migration to Istio ambient + waypoint + Gateway API, 2026-10-22
+
+Sources checked before the change (no cluster available here):
+
+- **Versions:** GitHub release API for Istio (1.31.2), Gateway API (v1.6.3), Argo Rollouts (v1.10.1), the Gateway API plugin (v0.17.0) and kind (v0.33.0, node v1.36.4 digest from the release notes).
+- **Plugin checksums:** the plugin release ships no checksums; the SHA-256 of the linux-amd64 and linux-arm64 assets was computed from the downloaded binaries and pinned in `infra/versions.env`.
+- **Istio docs:**
+  - Istio 1.31 supports Kubernetes 1.32–1.37 (supported-releases page).
+  - Waypoint deployment and `istio.io/use-waypoint`; `istio.io/ingress-use-waypoint` requires `ENABLE_INGRESS_WAYPOINT_ROUTING` in istiod, which defaults to false (waypoint usage page).
+  - NetworkPolicy in ambient must allow port 15008 and the kubelet probe source `169.254.7.127/32`.
+- **Metric labels:** waypoint metrics use `reporter="waypoint"` and carry `destination_service_name` ([istio/istio#51313](https://github.com/istio/istio/issues/51313), maintainer comment). Whether `destination_service_name` names the backend Service of an HTTPRoute split was not confirmed by any source; `scripts/scenarios/ambient_metrics.mjs` now verifies it on the stand before the canary drills.
+
+Verified locally:
+
+- `helm lint --strict` for both overlays.
+- `helm template` of the canary overlay renders Rollout (plugin `argoproj-labs/gatewayAPI`), stable/canary Services, the waypoint Gateway, the Service-parent HTTPRoute, the ingress Gateway and its HTTPRoute, and the ambient NetworkPolicy rules.
+- YAML parsing of all kind manifests.
+- 37 Node tests, including HTTPRoute weight reading, per-entry canary share and the backend-attribution check.
+
+The ambient kind stand and all kind scenarios have not been executed; no results are claimed.

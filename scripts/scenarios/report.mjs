@@ -25,16 +25,20 @@ export function collect(scenarioReports, steps, helmRollback) {
   return { generatedAt: new Date().toISOString(), passed: results.length > 0 && results.every(r => r.passed), results };
 }
 
+const entrySummary = entries => Object.entries(entries ?? {}).map(([e, d]) => `${e} errors ${d.errors}/${d.total}`).join(', ');
+
 export function summarize(report) {
   const m = report.measured ?? {};
   switch (report.scenario) {
     case 'canary-promote':
-      return `promoted ${m.canaryVersion} in ${m.secondsToDecision}s; client errors ${m.clientTrafficDuringCanary?.errors}/${m.clientTrafficDuringCanary?.total}`;
+      return `promoted ${m.canaryVersion} in ${m.secondsToDecision}s via weights ${(m.routeWeightsObserved ?? []).join('/')}; ${entrySummary(m.clientTrafficDuringCanary)}`;
     case 'canary-errors':
     case 'canary-latency':
-      return `aborted after ${m.secondsToDecision}s on ${m.rollbackReason?.failedMetrics?.map(f => `${f.name}=${f.lastValue}`).join(', ') || 'n/a'}; responses from canary after abort: ${m.clientTrafficAfterAbort?.byVersion?.[m.canaryVersion] ?? 0}`;
+      return `aborted after ${m.secondsToDecision}s on ${m.rollbackReason?.failedMetrics?.map(f => `${f.name}=${f.lastValue}`).join(', ') || 'n/a'}; canary responses after abort: ${Object.entries(m.clientTrafficAfterAbort ?? {}).map(([e, d]) => `${e} ${d.byVersion?.[m.canaryVersion] ?? 0}`).join(', ')}`;
     case 'pod-kill':
-      return `recovery ${m.recoverySeconds}s; client errors ${m.clientTraffic?.errors}/${m.clientTraffic?.total}`;
+      return `recovery ${m.recoverySeconds}s; ${entrySummary(m.clientTraffic)}`;
+    case 'ambient-metrics':
+      return `probe split ${Object.entries(m.probeSplit?.shares ?? {}).map(([s, v]) => `${s} ${Math.round(v)}%`).join(' / ') || 'n/a'}; waypoint sources: ${(m.waypointSources ?? []).map(s => s.source).join(', ') || 'none'}`;
     case 'migration-compat':
       return `new migrations: ${m.newMigrations?.length ?? 0}; old image ${m.oldImage}${m.sameImage ? ' (same as candidate)' : ''}`;
     default:

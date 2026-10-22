@@ -1,4 +1,6 @@
-# Constant synthetic traffic inside the mesh (namespace must have istio-injection=enabled).
+# Constant synthetic traffic from two entry points in an ambient namespace:
+#   releaseguard-loadgen          in-mesh calls to the releaseguard Service (ztunnel -> waypoint)
+#   releaseguard-loadgen-ingress  calls through the ingress gateway (gateway -> waypoint)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,6 +26,41 @@ spec:
           command: [node, /loadgen/loadgen.mjs]
           env:
             - {name: TARGET, value: 'http://releaseguard:3000'}
+            - {name: RPS, value: '25'}
+            - {name: ORDER_SHARE, value: '0.2'}
+          ports: [{name: metrics, containerPort: 9100}]
+          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: 500m, memory: 192Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: script, mountPath: /loadgen, readOnly: true}]
+      volumes:
+        - name: script
+          configMap: {name: releaseguard-loadgen}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: releaseguard-loadgen-ingress
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: releaseguard-loadgen-ingress}
+  template:
+    metadata:
+      labels: {app: releaseguard-loadgen-ingress}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9100'
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: loadgen
+          image: releaseguard:local
+          imagePullPolicy: IfNotPresent
+          command: [node, /loadgen/loadgen.mjs]
+          env:
+            - {name: TARGET, value: 'http://releaseguard-ingress-istio:80'}
             - {name: RPS, value: '25'}
             - {name: ORDER_SHARE, value: '0.2'}
           ports: [{name: metrics, containerPort: 9100}]

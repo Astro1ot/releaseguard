@@ -1,32 +1,294 @@
 {
-  "$schema":"https://json-schema.org/draft-07/schema#", "type":"object", "additionalProperties":false,
-  "required":["replicaCount","image","app","resources","service","ingress","lab","networkPolicy","progressiveDelivery"],
-  "properties":{
-    "replicaCount":{"type":"integer","minimum":1,"maximum":10},
-    "image":{"type":"object","additionalProperties":false,"required":["repository","tag","pullPolicy"],"properties":{"repository":{"type":"string","minLength":1},"tag":{"type":"string","minLength":1,"not":{"enum":["latest"]}},"pullPolicy":{"enum":["Always","IfNotPresent","Never"]}}},
-    "app":{"type":"object","additionalProperties":false,"required":["version","fault","secretName"],"properties":{"version":{"type":"string"},"fault":{"enum":["none","catalog-500","catalog-slow"]},"secretName":{"type":"string","minLength":1}}},
-    "resources":{"type":"object","additionalProperties":false,"required":["requests","limits"],"properties":{"requests":{"$ref":"#/definitions/resource"},"limits":{"$ref":"#/definitions/resource"}}},
-    "service":{"type":"object","additionalProperties":false,"properties":{"port":{"type":"integer","minimum":1024,"maximum":65535}}},
-    "ingress":{"type":"object","additionalProperties":false,"required":["enabled","className","host","tlsSecret"],"properties":{"enabled":{"type":"boolean"},"className":{"type":"string"},"host":{"type":"string"},"tlsSecret":{"type":"string"}}},
-    "lab":{"type":"object","additionalProperties":false,"properties":{"enabled":{"type":"boolean"},"storageSize":{"type":"string"}}},
-    "networkPolicy":{"type":"object","additionalProperties":false,"properties":{"enabled":{"type":"boolean"}}},
-    "progressiveDelivery":{"type":"object","additionalProperties":false,"required":["enabled","monitoringNamespace","canarySteps","abortScaleDownDelaySeconds","analysis"],"properties":{
-      "enabled":{"type":"boolean"},
-      "monitoringNamespace":{"type":"string","minLength":1},
-      "canarySteps":{"type":"array","minItems":1,"items":{"type":"integer","minimum":1,"maximum":99}},
-      "abortScaleDownDelaySeconds":{"type":"integer","minimum":0},
-      "analysis":{"type":"object","additionalProperties":false,
-        "required":["prometheusAddress","window","initialDelay","interval","count","failureLimit","consecutiveErrorLimit","minRequests","maxErrorRatio","maxErrorRatioDeltaVsStable","maxP95LatencyMs","maxP95LatencyDeltaVsStableMs"],
-        "properties":{
-          "prometheusAddress":{"type":"string","pattern":"^https?://"},
-          "window":{"$ref":"#/definitions/duration"},"initialDelay":{"$ref":"#/definitions/duration"},"interval":{"$ref":"#/definitions/duration"},
-          "count":{"type":"integer","minimum":1},"failureLimit":{"type":"integer","minimum":0},"consecutiveErrorLimit":{"type":"integer","minimum":0},
-          "minRequests":{"type":"integer","minimum":1},
-          "maxErrorRatio":{"type":"number","minimum":0,"maximum":1},"maxErrorRatioDeltaVsStable":{"type":"number","minimum":0,"maximum":1},
-          "maxP95LatencyMs":{"type":"number","exclusiveMinimum":0},"maxP95LatencyDeltaVsStableMs":{"type":"number","minimum":0}}}}}
+ "$schema": "https://json-schema.org/draft-07/schema#",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "replicaCount",
+  "image",
+  "app",
+  "resources",
+  "service",
+  "ingress",
+  "lab",
+  "networkPolicy",
+  "progressiveDelivery"
+ ],
+ "properties": {
+  "replicaCount": {
+   "type": "integer",
+   "minimum": 1,
+   "maximum": 10
   },
-  "definitions":{
-    "resource":{"type":"object","additionalProperties":false,"required":["cpu","memory"],"properties":{"cpu":{"type":"string"},"memory":{"type":"string"}}},
-    "duration":{"type":"string","pattern":"^[0-9]+(s|m)$"}
+  "image": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "repository",
+    "tag",
+    "pullPolicy"
+   ],
+   "properties": {
+    "repository": {
+     "type": "string",
+     "minLength": 1
+    },
+    "tag": {
+     "type": "string",
+     "minLength": 1,
+     "not": {
+      "enum": [
+       "latest"
+      ]
+     }
+    },
+    "pullPolicy": {
+     "enum": [
+      "Always",
+      "IfNotPresent",
+      "Never"
+     ]
+    }
+   }
+  },
+  "app": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "version",
+    "fault",
+    "secretName"
+   ],
+   "properties": {
+    "version": {
+     "type": "string"
+    },
+    "fault": {
+     "enum": [
+      "none",
+      "catalog-500",
+      "catalog-slow"
+     ]
+    },
+    "secretName": {
+     "type": "string",
+     "minLength": 1
+    }
+   }
+  },
+  "resources": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "requests",
+    "limits"
+   ],
+   "properties": {
+    "requests": {
+     "$ref": "#/definitions/resource"
+    },
+    "limits": {
+     "$ref": "#/definitions/resource"
+    }
+   }
+  },
+  "service": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "port": {
+     "type": "integer",
+     "minimum": 1024,
+     "maximum": 65535
+    }
+   }
+  },
+  "ingress": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "enabled",
+    "className",
+    "host",
+    "tlsSecret"
+   ],
+   "properties": {
+    "enabled": {
+     "type": "boolean"
+    },
+    "className": {
+     "type": "string"
+    },
+    "host": {
+     "type": "string"
+    },
+    "tlsSecret": {
+     "type": "string"
+    }
+   }
+  },
+  "lab": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "enabled": {
+     "type": "boolean"
+    },
+    "storageSize": {
+     "type": "string"
+    }
+   }
+  },
+  "networkPolicy": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "enabled": {
+     "type": "boolean"
+    }
+   }
+  },
+  "progressiveDelivery": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "enabled",
+    "monitoringNamespace",
+    "canarySteps",
+    "abortScaleDownDelaySeconds",
+    "analysis",
+    "ingressGateway"
+   ],
+   "properties": {
+    "enabled": {
+     "type": "boolean"
+    },
+    "monitoringNamespace": {
+     "type": "string",
+     "minLength": 1
+    },
+    "canarySteps": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 99
+     }
+    },
+    "abortScaleDownDelaySeconds": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "analysis": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "prometheusAddress",
+      "window",
+      "initialDelay",
+      "interval",
+      "count",
+      "failureLimit",
+      "consecutiveErrorLimit",
+      "minRequests",
+      "maxErrorRatio",
+      "maxErrorRatioDeltaVsStable",
+      "maxP95LatencyMs",
+      "maxP95LatencyDeltaVsStableMs",
+      "reporter"
+     ],
+     "properties": {
+      "prometheusAddress": {
+       "type": "string",
+       "pattern": "^https?://"
+      },
+      "window": {
+       "$ref": "#/definitions/duration"
+      },
+      "initialDelay": {
+       "$ref": "#/definitions/duration"
+      },
+      "interval": {
+       "$ref": "#/definitions/duration"
+      },
+      "count": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "failureLimit": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "consecutiveErrorLimit": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "minRequests": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "maxErrorRatio": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "maxErrorRatioDeltaVsStable": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "maxP95LatencyMs": {
+       "type": "number",
+       "exclusiveMinimum": 0
+      },
+      "maxP95LatencyDeltaVsStableMs": {
+       "type": "number",
+       "minimum": 0
+      },
+      "reporter": {
+       "enum": [
+        "waypoint",
+        "source",
+        "destination"
+       ]
+      }
+     }
+    },
+    "ingressGateway": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "enabled"
+     ],
+     "properties": {
+      "enabled": {
+       "type": "boolean"
+      }
+     }
+    }
+   }
   }
+ },
+ "definitions": {
+  "resource": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "cpu",
+    "memory"
+   ],
+   "properties": {
+    "cpu": {
+     "type": "string"
+    },
+    "memory": {
+     "type": "string"
+    }
+   }
+  },
+  "duration": {
+   "type": "string",
+   "pattern": "^[0-9]+(s|m)$"
+  }
+ }
 }

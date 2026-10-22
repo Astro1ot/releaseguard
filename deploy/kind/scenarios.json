@@ -7,7 +7,8 @@
   },
   "canary": {
     "maxRolloutMinutes": 20,
-    "postAbortObservationSeconds": 30,
+    "postDecisionObservationSeconds": 30,
+    "minResponsesPerStepWindow": 300,
     "maxClientErrorRatioDuringPromotion": 0.02
   },
   "migrationCompat": {

@@ -12,11 +12,18 @@ spec:
         - podSelector: {}
       ports: [{port: {{ .Values.service.port }}, protocol: TCP}]
 {{- if .Values.progressiveDelivery.enabled }}
-    # Prometheus scrapes the Istio agent's merged app + Envoy metrics endpoint.
+    # Ambient: ztunnel and the waypoint deliver mesh traffic as HBONE on 15008.
+    - from:
+        - podSelector: {}
+      ports: [{port: 15008, protocol: TCP}]
+    # Ambient SNATs kubelet probes to this link-local address.
+    - from:
+        - ipBlock: {cidr: 169.254.7.127/32}
+    # Prometheus scrapes application metrics directly (no sidecar metrics merging in ambient).
     - from:
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: {{ .Values.progressiveDelivery.monitoringNamespace }}}
-      ports: [{port: 15020, protocol: TCP}]
+      ports: [{port: {{ .Values.service.port }}, protocol: TCP}]
 {{- end }}
 {{- if .Values.lab.enabled }}
 ---

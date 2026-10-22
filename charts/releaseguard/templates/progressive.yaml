@@ -1,11 +1,12 @@
 {{- if .Values.progressiveDelivery.enabled }}
 {{- $pd := .Values.progressiveDelivery }}
 {{- $a := $pd.analysis }}
-{{- $canary := printf "reporter=\"source\",destination_service_namespace=\"%s\",destination_service_name=\"%s-canary\"" .Release.Namespace .Release.Name }}
-{{- $stable := printf "reporter=\"source\",destination_service_namespace=\"%s\",destination_service_name=\"%s-stable\"" .Release.Namespace .Release.Name }}
+{{- $canary := printf "reporter=\"%s\",destination_service_namespace=\"%s\",destination_service_name=\"%s-canary\"" $a.reporter .Release.Namespace .Release.Name }}
+{{- $stable := printf "reporter=\"%s\",destination_service_namespace=\"%s\",destination_service_name=\"%s-stable\"" $a.reporter .Release.Namespace .Release.Name }}
 {{- $w := $a.window }}
-# Argo Rollouts canary with Istio host-level traffic splitting. Argo Rollouts owns the
-# VirtualService weights and the stable/canary Service selectors; Helm only creates them.
+# Argo Rollouts canary over Istio ambient: the Gateway API traffic-router plugin sets the
+# backend weights of the HTTPRoute below; the waypoint enforces them for every caller of the
+# releaseguard Service. Helm creates the objects; Argo Rollouts owns weights and selectors.
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
@@ -29,10 +30,10 @@ spec:
       canaryService: {{ .Release.Name }}-canary
       abortScaleDownDelaySeconds: {{ $pd.abortScaleDownDelaySeconds }}
       trafficRouting:
-        istio:
-          virtualService:
-            name: {{ .Release.Name }}
-            routes: [primary]
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: {{ .Release.Name }}
+            namespace: {{ .Release.Namespace }}
       steps:
         {{- range $pd.canarySteps }}
         - setWeight: {{ . }}
@@ -56,24 +57,63 @@ spec:
   selector: {app: {{ .Release.Name }}}
   ports: [{name: http, port: {{ .Values.service.port }}, targetPort: http}]
 ---
-apiVersion: networking.istio.io/v1
-kind: VirtualService
+# Waypoint (Envoy) for the releaseguard Service; the Service opts in with istio.io/use-waypoint.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Release.Name }}-waypoint
+  labels: {istio.io/waypoint-for: service}
+spec:
+  gatewayClassName: istio-waypoint
+  listeners:
+    - {name: mesh, port: 15008, protocol: HBONE}
+---
+# Traffic split for in-mesh callers of the releaseguard Service (GAMMA: parentRef is the Service).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: {{ .Release.Name }}
 spec:
-  hosts: [{{ .Release.Name }}]
-  http:
-    - name: primary
-      # Only transport failures are retried; application 5xx must stay visible to the analysis.
-      retries: {attempts: 2, perTryTimeout: 5s, retryOn: 'connect-failure,refused-stream,reset'}
-      route:
-        - destination: {host: {{ .Release.Name }}-stable, port: {number: {{ .Values.service.port }}}}
-          weight: 100
-        - destination: {host: {{ .Release.Name }}-canary, port: {number: {{ .Values.service.port }}}}
-          weight: 0
+  parentRefs:
+    - {group: '', kind: Service, name: {{ .Release.Name }}, port: {{ .Values.service.port }}}
+  rules:
+    - backendRefs:
+        - {name: {{ .Release.Name }}-stable, port: {{ .Values.service.port }}, weight: 100}
+        - {name: {{ .Release.Name }}-canary, port: {{ .Values.service.port }}, weight: 0}
+{{- if $pd.ingressGateway.enabled }}
 ---
-# Every metric compares Istio client-side (reporter="source") telemetry of the canary Service,
-# and where stated, of the stable Service, over the same window.
+# Second entry point: an Istio ingress gateway. It forwards to the releaseguard Service, and
+# istio.io/ingress-use-waypoint on that Service sends the traffic through the same waypoint and
+# the same HTTPRoute split as in-mesh calls.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Release.Name }}-ingress
+  annotations: {networking.istio.io/service-type: ClusterIP}
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes: {namespaces: {from: Same}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}-ingress
+spec:
+  parentRefs:
+    - {name: {{ .Release.Name }}-ingress}
+  rules:
+    - matches: [{path: {type: PathPrefix, value: /api/}}]
+      backendRefs:
+        - {name: {{ .Release.Name }}, port: {{ .Values.service.port }}}
+{{- end }}
+---
+# Every metric uses the waypoint's L7 telemetry (istio_requests_total, istio_request_duration_milliseconds;
+# reporter="waypoint") for the canary backend Service and, where stated, the stable one, over the same window.
+# scripts/scenarios/ambient_metrics.mjs verifies these labels on the running stand before the drills.
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:

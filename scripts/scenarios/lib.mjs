@@ -59,6 +59,18 @@ export function promRange(query, startIso, endIso, step = '5s') {
   return JSON.parse(kubectl(null, ['get', '--raw', `${PROM}/query_range?${params}`]).stdout).data?.result ?? [];
 }
 
+export function promSeries(match) {
+  const body = JSON.parse(kubectl(null, ['get', '--raw', `${PROM}/series?${new URLSearchParams({ 'match[]': match, start: String(Math.floor(Date.now() / 1000) - 600) })}`]).stdout);
+  if (body.status !== 'success') throw new Error(`Prometheus series query failed: ${body.error ?? 'unknown error'}`);
+  return body.data;
+}
+
+export function promVector(query) {
+  const body = JSON.parse(kubectl(null, ['get', '--raw', `${PROM}/query?${new URLSearchParams({ query })}`]).stdout);
+  if (body.status !== 'success') throw new Error(`Prometheus query failed: ${body.error ?? 'unknown error'}`);
+  return body.data.result.map(r => ({ labels: r.metric, value: Number(r.value[1]) }));
+}
+
 export function scalarFromVector(body) {
   if (body.status !== 'success') throw new Error(`Prometheus query failed: ${body.error ?? 'unknown error'}`);
   const value = body.data.result[0]?.value?.[1];
@@ -68,11 +80,12 @@ export function scalarFromVector(body) {
 // Keeps the time series behind a scenario's verdict next to its report.
 export function saveScenarioMetrics(name, namespace, startedAt) {
   const end = now();
-  const sel = `reporter="source",destination_service_namespace="${namespace}"`;
+  const sel = `reporter="waypoint",destination_service_namespace="${namespace}"`;
   const queries = {
-    requestRateByServiceAndCode: `sum by (destination_service_name, response_code) (rate(istio_requests_total{${sel}}[30s]))`,
-    p95LatencyMsByService: `histogram_quantile(0.95, sum by (destination_service_name, le) (rate(istio_request_duration_milliseconds_bucket{${sel}}[30s])))`,
-    clientResponsesByVersionAndStatus: `sum by (version, status) (rate(rg_loadgen_responses_total{namespace="${namespace}"}[30s]))`,
+    waypointRequestRateByServiceAndCode: `sum by (destination_service_name, response_code) (rate(istio_requests_total{${sel}}[30s]))`,
+    waypointRequestRateBySource: `sum by (source_workload, destination_service_name) (rate(istio_requests_total{${sel}}[30s]))`,
+    waypointP95LatencyMsByService: `histogram_quantile(0.95, sum by (destination_service_name, le) (rate(istio_request_duration_milliseconds_bucket{${sel}}[30s])))`,
+    clientResponsesByEntryVersionAndStatus: `sum by (app, version, status) (rate(rg_loadgen_responses_total{namespace="${namespace}"}[30s]))`,
   };
   const series = {};
   for (const [key, query] of Object.entries(queries)) {
@@ -80,6 +93,14 @@ export function saveScenarioMetrics(name, namespace, startedAt) {
     catch (error) { series[key] = { query, error: error.message }; }
   }
   writeArtifact(`scenarios/${name}.metrics.json`, { namespace, start: startedAt, end, series });
+}
+
+// Share of waypoint requests per backend Service of a probe split; the parent Service must not absorb them.
+export function evaluateProbeSplit(rows, parent, backends) {
+  const byService = Object.fromEntries(rows.map(r => [r.labels.destination_service_name, r.value]));
+  const total = backends.reduce((n, b) => n + (byService[b] ?? 0), 0);
+  const shares = Object.fromEntries(backends.map(b => [b, total ? (100 * (byService[b] ?? 0)) / total : 0]));
+  return { byService, total, shares, attributedToBackends: total > 0 && backends.every(b => shares[b] >= 25 && shares[b] <= 75), parentSeen: (byService[parent] ?? 0) > 0 };
 }
 
 // --- Cluster state readers
@@ -106,9 +127,10 @@ export function summarizeRollout(rollout) {
   };
 }
 
-export function routeWeights(virtualService, release) {
-  const route = virtualService.spec.http.find(r => r.name === 'primary')?.route ?? [];
-  const weightOf = host => route.find(r => r.destination.host === host)?.weight ?? 0;
+// Backend weights of the canary HTTPRoute, as set by the Argo Rollouts Gateway API plugin.
+export function routeWeights(httpRoute, release) {
+  const refs = (httpRoute.spec.rules ?? []).flatMap(r => r.backendRefs ?? []);
+  const weightOf = name => refs.find(b => b.name === name)?.weight ?? 0;
   return { stable: weightOf(`${release}-stable`), canary: weightOf(`${release}-canary`) };
 }
 
@@ -135,11 +157,27 @@ export function analysisRunsFor(namespace, podTemplateHash) {
     .map(summarizeAnalysisRun);
 }
 
-// --- Client-side view from the in-mesh load generator
+// --- Client-side view from the load generators (one per entry point)
 
-export function loadgenStats(namespace) {
+export const ENTRIES = { mesh: 'releaseguard-loadgen', ingress: 'releaseguard-loadgen-ingress' };
+
+export function loadgenStats(namespace, deployment = ENTRIES.mesh) {
   const script = "fetch('http://127.0.0.1:9100/stats').then(r=>r.text()).then(t=>console.log(t))";
-  return JSON.parse(kubectl(namespace, ['exec', 'deploy/releaseguard-loadgen', '-c', 'loadgen', '--', 'node', '-e', script]).stdout.trim());
+  return JSON.parse(kubectl(namespace, ['exec', `deploy/${deployment}`, '-c', 'loadgen', '--', 'node', '-e', script]).stdout.trim());
+}
+
+export function entryStats(namespace) {
+  return Object.fromEntries(Object.entries(ENTRIES).map(([entry, deployment]) => [entry, loadgenStats(namespace, deployment)]));
+}
+
+export function diffEntries(before, after) {
+  return Object.fromEntries(Object.keys(after).map(entry => [entry, diffCounts(before[entry], after[entry])]));
+}
+
+// Share of an entry's responses served by the given version, in percent.
+export function versionShare(window, version) {
+  const served = Object.entries(window.byVersion).filter(([v]) => v !== 'none').reduce((n, [, c]) => n + c, 0);
+  return served ? (100 * (window.byVersion[version] ?? 0)) / served : null;
 }
 
 export function diffCounts(before, after) {

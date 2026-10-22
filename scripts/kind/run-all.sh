@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full kind run: canary drills, pod failure, migration compatibility and the existing Helm
+# Full kind run: ambient metric-label check, canary drills, pod failure, migration compatibility and the existing Helm
 # rollback rehearsal. Every step runs even if an earlier one failed; diagnostics are collected
 # per namespace before it is deleted; the exit code is non-zero if any step failed.
 set -uo pipefail
@@ -26,6 +26,8 @@ if [ $failed = 1 ]; then
   exit 1
 fi
 
+# Verify waypoint metric labels and both entry points before trusting the canary analysis.
+step ambient-metrics node scripts/scenarios/ambient_metrics.mjs
 step canary-promote node scripts/scenarios/canary.mjs --case promote
 step canary-errors node scripts/scenarios/canary.mjs --case errors
 step canary-latency node scripts/scenarios/canary.mjs --case latency

@@ -74,6 +74,7 @@ export function parseJunit(xml) {
 }
 
 const SCENARIO_TESTS = [
+  ['scripts/scenarios', 'ambient-metrics'],
   ['scripts/scenarios', 'canary-promote'], ['scripts/scenarios', 'canary-errors'], ['scripts/scenarios', 'canary-latency'],
   ['scripts/scenarios', 'pod-kill'], ['scripts/scenarios', 'migration-compat'], ['scripts/scenarios', 'helm-rollback'],
 ];

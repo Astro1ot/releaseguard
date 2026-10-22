@@ -22,13 +22,15 @@ lab:
   storageSize: 1Gi
 networkPolicy:
   enabled: true
-# Canary delivery with Argo Rollouts + Istio. Disabled: a plain Deployment with Helm rollback.
+# Canary delivery: Argo Rollouts (Gateway API plugin) + Istio ambient waypoint. Disabled: a plain Deployment with Helm rollback.
 progressiveDelivery:
   enabled: false
   monitoringNamespace: monitoring
   # Canary traffic weight (percent) per step; each step is followed by a Prometheus analysis.
   canarySteps: [10, 30, 60]
   abortScaleDownDelaySeconds: 30
+  # Second entry point through an Istio ingress gateway (Gateway API), routed via the same waypoint.
+  ingressGateway: {enabled: true}
   analysis:
     prometheusAddress: http://prometheus.monitoring.svc.cluster.local:9090
     window: 1m
@@ -42,3 +44,5 @@ progressiveDelivery:
     maxErrorRatioDeltaVsStable: 0.01
     maxP95LatencyMs: 400
     maxP95LatencyDeltaVsStableMs: 200
+    # Istio telemetry reporter for the waypoint proxy; verified on the stand by scripts/scenarios/ambient_metrics.mjs.
+    reporter: waypoint

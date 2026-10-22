@@ -6,11 +6,6 @@ metadata:
     prometheus.io/scrape: 'true'
     prometheus.io/port: {{ .Values.service.port | quote }}
     prometheus.io/path: /metrics
-    {{- if .Values.progressiveDelivery.enabled }}
-    # Init-container migrations and data-store clients bypass the sidecar: they run before
-    # istio-proxy is ready, and PostgreSQL/Redis/Kafka are outside the mesh in this lab.
-    traffic.sidecar.istio.io/excludeOutboundPorts: '5432,6379,9092'
-    {{- end }}
 spec:
   automountServiceAccountToken: false
   terminationGracePeriodSeconds: 30

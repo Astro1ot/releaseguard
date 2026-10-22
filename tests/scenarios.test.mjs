@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { diffCounts, routeWeights, summarizeAnalysisRun, summarizeRollout, scalarFromVector } from '../scripts/scenarios/lib.mjs';
+import { diffCounts, diffEntries, evaluateProbeSplit, routeWeights, summarizeAnalysisRun, summarizeRollout, scalarFromVector, versionShare } from '../scripts/scenarios/lib.mjs';
 import { collect, toJunit, toMarkdown } from '../scripts/scenarios/report.mjs';
 import { evaluateGate, junitTotals, matches } from '../scripts/ci/release_gate.mjs';
 import { Tally } from '../deploy/kind/loadgen.mjs';
@@ -22,13 +22,14 @@ test('load generator exposes per-version counters for Prometheus and snapshots',
   assert.match(t.metrics(), /rg_loadgen_responses_total\{route="\/api\/orders",status="503",version="v2"\} 1/);
 });
 
-test('rollout and VirtualService state are read from Argo Rollouts and Istio objects', () => {
+test('rollout state and HTTPRoute backend weights are read from Argo Rollouts and Gateway API objects', () => {
   const rollout = { spec: { replicas: 3, template: { spec: { containers: [{ name: 'api', env: [{ name: 'APP_VERSION', value: 'v2' }, { name: 'RELEASE_FAULT', value: 'none' }] }] } } },
     status: { phase: 'Degraded', abort: true, stableRS: 'aaa', currentPodHash: 'bbb', message: 'RolloutAborted: metric failed', availableReplicas: 3 } };
   assert.deepEqual(summarizeRollout(rollout), { phase: 'Degraded', message: 'RolloutAborted: metric failed', abort: true, stableRS: 'aaa', currentPodHash: 'bbb',
     currentStepIndex: null, replicas: 3, availableReplicas: 3, specVersion: 'v2', specFault: 'none' });
-  const vs = { spec: { http: [{ name: 'primary', route: [{ destination: { host: 'releaseguard-stable' }, weight: 90 }, { destination: { host: 'releaseguard-canary' }, weight: 10 }] }] } };
-  assert.deepEqual(routeWeights(vs, 'releaseguard'), { stable: 90, canary: 10 });
+  const route = { spec: { parentRefs: [{ group: '', kind: 'Service', name: 'releaseguard' }], rules: [{ backendRefs: [{ name: 'releaseguard-stable', port: 3000, weight: 90 }, { name: 'releaseguard-canary', port: 3000, weight: 10 }] }] } };
+  assert.deepEqual(routeWeights(route, 'releaseguard'), { stable: 90, canary: 10 });
+  assert.deepEqual(routeWeights({ spec: { rules: [{ backendRefs: [{ name: 'releaseguard-stable', weight: 100 }] }] } }, 'releaseguard'), { stable: 100, canary: 0 });
 });
 
 test('failed AnalysisRun is reduced to the metrics that caused the abort', () => {
@@ -50,13 +51,13 @@ test('Prometheus scalar helper distinguishes no data from zero and rejects faile
 });
 
 test('scenario summary fails a step that crashed before writing its report and exports JUnit', () => {
-  const reports = [{ scenario: 'pod-kill', passed: true, durationSeconds: 70, failedChecks: [], measured: { recoverySeconds: 21.5, clientTraffic: { errors: 0, total: 1510 } }, checks: [] }];
+  const reports = [{ scenario: 'pod-kill', passed: true, durationSeconds: 70, failedChecks: [], measured: { recoverySeconds: 21.5, clientTraffic: { mesh: { errors: 0, total: 1510 }, ingress: { errors: 2, total: 1498 } } }, checks: [] }];
   const steps = [{ name: 'stand-setup', status: 'passed', durationSeconds: 300 }, { name: 'pod-kill', status: 'passed', durationSeconds: 71 }, { name: 'migration-compat', status: 'failed', durationSeconds: 12 },
     { name: 'helm-rollback', status: 'passed', durationSeconds: 90 }];
   const summary = collect(reports, steps, { result: 'failed', rollback: 'verified', durationSeconds: 8.4 });
   assert.equal(summary.passed, false);
   assert.deepEqual(summary.results.map(r => r.passed), [true, true, false, true]);
-  assert.match(toMarkdown(summary), /pod-kill \| passed \| 70 \| recovery 21.5s; client errors 0\/1510/);
+  assert.match(toMarkdown(summary), /pod-kill \| passed \| 70 \| recovery 21.5s; mesh errors 0\/1510, ingress errors 2\/1498/);
   const junit = toJunit(summary);
   assert.deepEqual(junitTotals(junit), { tests: 4, failures: 1 });
 });
@@ -89,4 +90,26 @@ test('release gate requires every mandatory report and ignores the advisory LLM 
   assert.equal(evaluateGate(rules, fs).passed, false);
   assert.deepEqual(evaluateGate({ ...rules, kindScenarios: ['pod-kill'] }, fs).checks.at(-1), { name: 'kind scenario pod-kill', passed: false, detail: 'missing' });
   assert.deepEqual(matches('artifacts/drills/kafka-*.json', ['kafka-1.json', 'redis-1.json', 'kafka.txt']), ['kafka-1.json']);
+});
+
+test('observed canary share is computed per entry point and ignores failed connections', () => {
+  const before = { mesh: { at: 't0', counts: {} }, ingress: { at: 't0', counts: {} } };
+  const after = { mesh: { at: 't1', counts: { '/api/catalog|200|v1': 900, '/api/catalog|503|v2': 100, '/api/catalog|0|none': 7 } },
+    ingress: { at: 't1', counts: { '/api/catalog|200|v1': 880, '/api/orders|201|v2': 120 } } };
+  const d = diffEntries(before, after);
+  assert.equal(versionShare(d.mesh, 'v2'), 10);
+  assert.equal(versionShare(d.ingress, 'v2'), 12);
+  assert.equal(versionShare(diffCounts({ counts: {} }, { counts: { 'x|0|none': 3 } }), 'v2'), null);
+});
+
+test('waypoint attribution check accepts a per-backend split and rejects attribution to the parent Service', () => {
+  const backends = ['rg-probe-a', 'rg-probe-b'];
+  const ok = evaluateProbeSplit([{ labels: { destination_service_name: 'rg-probe-a' }, value: 210 }, { labels: { destination_service_name: 'rg-probe-b' }, value: 190 }], 'rg-probe', backends);
+  assert.equal(ok.attributedToBackends, true);
+  assert.equal(Math.round(ok.shares['rg-probe-a']), 53);
+  const parentOnly = evaluateProbeSplit([{ labels: { destination_service_name: 'rg-probe' }, value: 400 }], 'rg-probe', backends);
+  assert.equal(parentOnly.attributedToBackends, false);
+  assert.equal(parentOnly.parentSeen, true);
+  const skewed = evaluateProbeSplit([{ labels: { destination_service_name: 'rg-probe-a' }, value: 390 }, { labels: { destination_service_name: 'rg-probe-b' }, value: 10 }], 'rg-probe', backends);
+  assert.equal(skewed.attributedToBackends, false);
 });

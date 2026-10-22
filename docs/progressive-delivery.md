@@ -1,40 +1,56 @@
-# Progressive delivery: Argo Rollouts + Istio + Prometheus
+# Progressive delivery: Argo Rollouts + Istio ambient + Gateway API
 
-## Почему эта связка
+## Схема
 
-- **Argo Rollouts** управляет шагами canary, запускает анализ на каждом шаге и сам выполняет abort с возвратом трафика. Логику отката не нужно писать в CI-скриптах.
-- **Istio** в режиме sidecar делит трафик по весам на уровне HTTP-запросов, а не по числу подов. Уже на шаге 10 % canary получает ровно 10 % запросов при 3 репликах.
-- **Метрики Envoy** (`istio_requests_total`, `istio_request_duration_milliseconds`) снимаются на стороне клиента (`reporter="source"`). Поэтому в анализ попадают и ответы, которых приложение не успело записать в свои метрики: обрывы соединений, 503 от прокси.
-- **Prometheus** хранит одинаковые ряды для `releaseguard-stable` и `releaseguard-canary`. Анализ сравнивает canary с порогом и со stable в одном окне.
+```text
+loadgen (in-mesh) ──► Service releaseguard ─┐                       ┌─► Service releaseguard-stable ─► pods v1
+                                            ├─► waypoint (Envoy) ───┤   HTTPRoute releaseguard:
+loadgen-ingress ──► Gateway releaseguard-   │   istio.io/use-waypoint   weights 100/0 → 90/10 → …
+   ingress (istio)   → HTTPRoute → Service ─┘   ingress-use-waypoint └─► Service releaseguard-canary ─► pods v2
+                                                                    ▲
+Argo Rollouts ── Gateway API plugin (argoproj-labs/gatewayAPI) ─────┘ меняет weight в backendRefs
+Prometheus ◄── istio_requests_total / istio_request_duration_milliseconds, reporter="waypoint"
+```
 
-## Как устроено в чарте
+- **Ambient.** Namespace `rg-canary` помечен `istio.io/dataplane-mode=ambient`. В подах приложения нет sidecar: L4 и mTLS обеспечивает ztunnel на узле, L7-маршрутизацию — waypoint.
+- **Waypoint.** Это Gateway API `Gateway` класса `istio-waypoint` (`releaseguard-waypoint`). Сервис `releaseguard` подключён к нему меткой `istio.io/use-waypoint`.
+- **Разделение трафика.** Stable и canary — отдельные Service `releaseguard-stable` и `releaseguard-canary`. Их веса задаются в `HTTPRoute releaseguard`, родитель маршрута — Service `releaseguard` (GAMMA). Маршрут исполняет waypoint для любого вызывающего.
+- **Argo Rollouts.** Вместо `trafficRouting.istio` используется `trafficRouting.plugins.argoproj-labs/gatewayAPI`. Плагин меняет только веса `backendRefs` этого HTTPRoute.
+- **Второй вход.** Ingress Gateway `releaseguard-ingress` (класс `istio`) направляет `/api/` в Service `releaseguard`. Метка `istio.io/ingress-use-waypoint=true` на Service (вместе с `ENABLE_INGRESS_WAYPOINT_ROUTING=true` у istiod) отправляет этот трафик через тот же waypoint и тот же HTTPRoute. Оба входа обслуживаются одним набором правил.
+- **Зависимости вне mesh.** PostgreSQL, Redis и Kafka исключены из mesh меткой пода `istio.io/dataplane-mode: none`.
 
-`progressiveDelivery.enabled=true` (`environments/kind-progressive.yaml`) включает следующие объекты:
+## Метрики waypoint
 
-| Объект | Назначение |
+- **Reporter.** Waypoint публикует стандартные L7-метрики Istio с `reporter="waypoint"`, а не `source` или `destination`. Так задумано разработчиками Istio ([istio/istio#51313](https://github.com/istio/istio/issues/51313)), хотя в справочнике метрик указаны только `source` и `destination`. Ряды содержат `destination_service_name`, `destination_service_namespace`, `destination_workload`, `source_workload`, `response_code`.
+- **Атрибуция при split.** Документация не говорит однозначно, какой сервис попадает в `destination_service_name` при split через HTTPRoute — родительский или backend. Поэтому перед canary-сценариями выполняется `scripts/scenarios/ambient_metrics.mjs`. Он создаёт пробный HTTPRoute 50/50 на два backend Service тех же подов, даёт 400 запросов и проверяет, что waypoint относит запросы к каждому backend. Если ряды достаются родительскому Service, сценарий проваливается: разделить stable и canary по этой метке нельзя, и анализ нужно перестраивать.
+- **Остальные проверки.** Тот же сценарий проверяет, что оба входа видны на waypoint (`source_workload` = `releaseguard-loadgen` и `releaseguard-ingress-istio`), что нужные анализу метки существуют, что гистограмма задержки есть и что запросы со стороны stable возвращают значения.
+- **Prometheus.** Waypoint и ingress gateway скрейпятся отдельным job (`:15020/stats/prometheus`, поды с меткой `gateway.networking.k8s.io/gateway-name`). Из job аннотаций они исключены, чтобы ряды `istio_*` не дублировались. Метрики приложения в ambient снимаются напрямую с порта 3000, потому что sidecar для объединения метрик нет.
+
+## Анализ (без изменений порогов)
+
+| Метрика | Условие |
 |---|---|
-| `Rollout releaseguard` | Шаблон пода тот же, что у Deployment (`templates/_pod.tpl`). Шаги задаются в `canarySteps`, после каждого `setWeight` идёт `analysis` |
-| `Service releaseguard-stable`, `releaseguard-canary` | Argo Rollouts дописывает в селектор `rollouts-pod-template-hash` |
-| `VirtualService releaseguard` | Маршрут `primary` с весами stable/canary. Повторы только для транспортных ошибок, чтобы 5xx приложения оставались видимыми анализу |
-| `AnalysisTemplate releaseguard-canary-health` | Пять метрик: объём запросов, доля 5xx, доля 5xx относительно stable, p95, p95 относительно stable |
-| `NetworkPolicy` | Дополнительно разрешает Prometheus из namespace `monitoring` на порт 15020 |
+| `canary-request-volume` | ≥ 40 запросов к canary за окно 1 мин |
+| `canary-error-ratio` | доля 5xx canary ≤ 2 % |
+| `canary-error-ratio-vs-stable` | доля 5xx canary − stable ≤ 1 п. п. |
+| `canary-p95-latency-ms` | p95 canary ≤ 400 мс |
+| `canary-p95-latency-vs-stable-ms` | p95 canary − p95 stable ≤ 200 мс |
 
-Зависимости (PostgreSQL, Redis, Kafka) исключены из mesh меткой `sidecar.istio.io/inject: 'false'`. Порты 5432, 6379 и 9092 исключены из перехвата sidecar приложения, иначе init-контейнер миграций стартовал бы до готовности istio-proxy.
+Все метрики используют `reporter="waypoint"` (значение задаётся в `progressiveDelivery.analysis.reporter`). Период: старт через 30 с, 4 измерения через 20 с, `failureLimit: 1`, `consecutiveErrorLimit: 2`.
 
-## Что происходит при провале
+## Что проверяют сценарии canary
 
-1. Метрика превышает порог больше `failureLimit` раз, или запрос к Prometheus ошибается больше `consecutiveErrorLimit` раз подряд. AnalysisRun получает статус Failed или Error.
-2. Argo Rollouts ставит `status.abort=true`, устанавливает вес canary 0 и через `abortScaleDownDelaySeconds` (30 с) масштабирует canary до нуля. Rollout переходит в `Degraded`.
-3. Сценарий проверяет, что вес canary 0, stable 100, stable ReplicaSet не изменился и за 30 с после отката ни один ответ не пришёл от canary-версии (по `X-App-Version` в генераторе трафика).
-4. Причина записывается в аннотацию `releaseguard.io/last-abort-reason`, в отчёт `artifacts/scenarios/canary-*.json` и в оставшийся в namespace AnalysisRun.
-5. Определение релиза возвращается к stable-версии через `helm upgrade`. Argo Rollouts распознаёт шаблон stable и применяет его без шагов анализа.
+| Проверка | promote | errors / latency |
+|---|---|---|
+| Вес в HTTPRoute | прошёл 10 → 30 → 60, после промоута 100/0 | был 10 до решения, затем 100/0 |
+| Фактическая доля canary по каждому входу | на каждой ступени в пределах ±max(5 п. п., 30 % веса) | на ступени 10 % — так же |
+| Решение AnalysisRun | все AnalysisRun `Successful` | AnalysisRun `Failed` по `canary-error-ratio` / `canary-p95-latency-ms`, `canary-request-volume` не провален (решение принято по реальному трафику) |
+| Возврат на stable | после промоута оба входа получают только новую версию | 30 с после abort ни одного ответа canary ни на одном входе; stable ReplicaSet не изменился |
+| Причина | — | аннотация `releaseguard.io/last-abort-reason`, AnalysisRun, отчёт |
 
-## Генератор трафика
+## Ограничения
 
-`deploy/kind/loadgen.mjs` работает внутри mesh (25 запросов/с, 20 % — создание заказа). Он считает ответы по маршруту, коду и версии (`/stats`, `/metrics`). Это клиентская точка зрения для сценариев: сколько ошибок увидели пользователи и какая версия их обслуживала.
-
-## Известные ограничения
-
-- **Чувствительность порогов.** Сценарий `canary-errors` вводит около 80 % ошибок и подтверждает срабатывание отката, но не чувствительность порога 2 %. Ошибку в 3–5 % при 2,5 запроса/с на шаге 10 % статистически трудно отличить от шума за одну минуту.
-- **Профиль трафика.** Пороги и окна подобраны под синтетическую нагрузку стенда.
-- **Grafana в kind.** В kind нет Grafana, временные ряды сохраняются в артефакты сценариев.
+- **Retry.** Политика повторов задаётся в mesh (`meshConfig.defaultHttpRetryPolicy`: только `connect-failure,refused-stream,reset`), потому что в стандартном канале Gateway API у HTTPRoute нет поля retry.
+- **Чувствительность порога 2 %.** `canary-errors` подтверждает откат при ~80 % ошибок, но не чувствительность порога 2 %.
+- **NetworkPolicy в ambient.** Нужно разрешать HBONE (порт 15008) и SNAT-адрес проб kubelet `169.254.7.127/32`. Это сделано в чарте.
+- **Проверка на кластере.** Конфигурация проверена `helm lint/template` и юнит-тестами. Прогон на kind для ambient-схемы ещё не выполнялся.

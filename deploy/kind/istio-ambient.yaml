@@ -1,0 +1,19 @@
+# Istio ambient for the kind stand: istiod, istio-cni and ztunnel (profile "ambient").
+#   istioctl install -y -f deploy/kind/istio-ambient.yaml
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  profile: ambient
+  meshConfig:
+    # Retry only transport failures. Application 5xx and slow responses must reach the
+    # canary analysis unchanged.
+    defaultHttpRetryPolicy:
+      attempts: 2
+      retryOn: connect-failure,refused-stream,reset
+  values:
+    pilot:
+      env:
+        # Required for istio.io/ingress-use-waypoint (defaults to false in istiod).
+        ENABLE_INGRESS_WAYPOINT_ROUTING: 'true'
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
