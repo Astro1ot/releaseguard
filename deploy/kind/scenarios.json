@@ -1,0 +1,17 @@
+{
+  "podKill": {
+    "observationSeconds": 60,
+    "minRequests": 500,
+    "maxClientErrorRatio": 0.01,
+    "maxRecoverySeconds": 120
+  },
+  "canary": {
+    "maxRolloutMinutes": 20,
+    "postAbortObservationSeconds": 30,
+    "maxClientErrorRatioDuringPromotion": 0.02
+  },
+  "migrationCompat": {
+    "smokeTimeoutSeconds": 60,
+    "migrationJobTimeoutSeconds": 180
+  }
+}

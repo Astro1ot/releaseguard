@@ -1,0 +1,146 @@
+{{- if .Values.progressiveDelivery.enabled }}
+{{- $pd := .Values.progressiveDelivery }}
+{{- $a := $pd.analysis }}
+{{- $canary := printf "reporter=\"source\",destination_service_namespace=\"%s\",destination_service_name=\"%s-canary\"" .Release.Namespace .Release.Name }}
+{{- $stable := printf "reporter=\"source\",destination_service_namespace=\"%s\",destination_service_name=\"%s-stable\"" .Release.Namespace .Release.Name }}
+{{- $w := $a.window }}
+# Argo Rollouts canary with Istio host-level traffic splitting. Argo Rollouts owns the
+# VirtualService weights and the stable/canary Service selectors; Helm only creates them.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .Release.Name }}
+  labels: {app: {{ .Release.Name }}}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 5
+  minReadySeconds: 5
+  selector:
+    matchLabels: {app: {{ .Release.Name }}}
+  # Failed AnalysisRuns stay in the namespace as the in-cluster record of why a canary was aborted.
+  analysis:
+    successfulRunHistoryLimit: 5
+    unsuccessfulRunHistoryLimit: 10
+  template:
+    {{- include "releaseguard.podTemplate" . | nindent 4 }}
+  strategy:
+    canary:
+      stableService: {{ .Release.Name }}-stable
+      canaryService: {{ .Release.Name }}-canary
+      abortScaleDownDelaySeconds: {{ $pd.abortScaleDownDelaySeconds }}
+      trafficRouting:
+        istio:
+          virtualService:
+            name: {{ .Release.Name }}
+            routes: [primary]
+      steps:
+        {{- range $pd.canarySteps }}
+        - setWeight: {{ . }}
+        - analysis:
+            templates: [{templateName: {{ $.Release.Name }}-canary-health}]
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-stable
+spec:
+  selector: {app: {{ .Release.Name }}}
+  ports: [{name: http, port: {{ .Values.service.port }}, targetPort: http}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-canary
+spec:
+  selector: {app: {{ .Release.Name }}}
+  ports: [{name: http, port: {{ .Values.service.port }}, targetPort: http}]
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  hosts: [{{ .Release.Name }}]
+  http:
+    - name: primary
+      # Only transport failures are retried; application 5xx must stay visible to the analysis.
+      retries: {attempts: 2, perTryTimeout: 5s, retryOn: 'connect-failure,refused-stream,reset'}
+      route:
+        - destination: {host: {{ .Release.Name }}-stable, port: {number: {{ .Values.service.port }}}}
+          weight: 100
+        - destination: {host: {{ .Release.Name }}-canary, port: {number: {{ .Values.service.port }}}}
+          weight: 0
+---
+# Every metric compares Istio client-side (reporter="source") telemetry of the canary Service,
+# and where stated, of the stable Service, over the same window.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ .Release.Name }}-canary-health
+spec:
+  metrics:
+    - name: canary-request-volume
+      initialDelay: {{ $a.initialDelay }}
+      interval: {{ $a.interval }}
+      count: {{ $a.count }}
+      failureLimit: {{ $a.failureLimit }}
+      consecutiveErrorLimit: {{ $a.consecutiveErrorLimit }}
+      successCondition: result[0] >= {{ $a.minRequests }}
+      provider:
+        prometheus:
+          address: {{ $a.prometheusAddress }}
+          query: sum(increase(istio_requests_total{ {{- $canary -}} }[{{ $w }}])) or vector(0)
+    - name: canary-error-ratio
+      initialDelay: {{ $a.initialDelay }}
+      interval: {{ $a.interval }}
+      count: {{ $a.count }}
+      failureLimit: {{ $a.failureLimit }}
+      consecutiveErrorLimit: {{ $a.consecutiveErrorLimit }}
+      successCondition: result[0] <= {{ $a.maxErrorRatio }}
+      provider:
+        prometheus:
+          address: {{ $a.prometheusAddress }}
+          query: >-
+            (sum(rate(istio_requests_total{ {{- $canary -}} ,response_code=~"5.."}[{{ $w }}])) or vector(0))
+            / clamp_min(sum(rate(istio_requests_total{ {{- $canary -}} }[{{ $w }}])) or vector(0), 1e-9)
+    - name: canary-error-ratio-vs-stable
+      initialDelay: {{ $a.initialDelay }}
+      interval: {{ $a.interval }}
+      count: {{ $a.count }}
+      failureLimit: {{ $a.failureLimit }}
+      consecutiveErrorLimit: {{ $a.consecutiveErrorLimit }}
+      successCondition: result[0] <= {{ $a.maxErrorRatioDeltaVsStable }}
+      provider:
+        prometheus:
+          address: {{ $a.prometheusAddress }}
+          query: >-
+            ((sum(rate(istio_requests_total{ {{- $canary -}} ,response_code=~"5.."}[{{ $w }}])) or vector(0))
+            / clamp_min(sum(rate(istio_requests_total{ {{- $canary -}} }[{{ $w }}])) or vector(0), 1e-9))
+            - ((sum(rate(istio_requests_total{ {{- $stable -}} ,response_code=~"5.."}[{{ $w }}])) or vector(0))
+            / clamp_min(sum(rate(istio_requests_total{ {{- $stable -}} }[{{ $w }}])) or vector(0), 1e-9))
+    - name: canary-p95-latency-ms
+      initialDelay: {{ $a.initialDelay }}
+      interval: {{ $a.interval }}
+      count: {{ $a.count }}
+      failureLimit: {{ $a.failureLimit }}
+      consecutiveErrorLimit: {{ $a.consecutiveErrorLimit }}
+      successCondition: '!isNaN(result[0]) && result[0] <= {{ $a.maxP95LatencyMs }}'
+      provider:
+        prometheus:
+          address: {{ $a.prometheusAddress }}
+          query: histogram_quantile(0.95, sum by (le) (rate(istio_request_duration_milliseconds_bucket{ {{- $canary -}} }[{{ $w }}])))
+    - name: canary-p95-latency-vs-stable-ms
+      initialDelay: {{ $a.initialDelay }}
+      interval: {{ $a.interval }}
+      count: {{ $a.count }}
+      failureLimit: {{ $a.failureLimit }}
+      consecutiveErrorLimit: {{ $a.consecutiveErrorLimit }}
+      successCondition: '!isNaN(result[0]) && result[0] <= {{ $a.maxP95LatencyDeltaVsStableMs }}'
+      provider:
+        prometheus:
+          address: {{ $a.prometheusAddress }}
+          query: >-
+            histogram_quantile(0.95, sum by (le) (rate(istio_request_duration_milliseconds_bucket{ {{- $canary -}} }[{{ $w }}])))
+            - histogram_quantile(0.95, sum by (le) (rate(istio_request_duration_milliseconds_bucket{ {{- $stable -}} }[{{ $w }}])))
+{{- end }}

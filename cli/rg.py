@@ -159,7 +159,7 @@ def main(argv=None):
         p.add_argument('--namespace', required=True)
         p.add_argument('--context', required=True)
         p.add_argument('--image-tag')
-        p.add_argument('--fault', choices=['none', 'catalog-500'])
+        p.add_argument('--fault', choices=['none', 'catalog-500', 'catalog-slow'])
         if command == 'deploy': p.add_argument('--url', required=True, help='Reachable API endpoint for post-release business tests')
     p = sub.add_parser('ansible', help='Run a reviewed playbook using ansible-runner (Linux/WSL)')
     p.add_argument('--private-data-dir', required=True)

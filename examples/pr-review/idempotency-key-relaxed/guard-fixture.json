@@ -1,0 +1,19 @@
+{
+  "summary": "Синтетический ответ для проверки guard: AC-2 заявлен покрытым тестами, которые в этом pipeline падают.",
+  "riskLevel": "high",
+  "risks": [
+    { "title": "Повтор ключа с другим товаром больше не даёт 409", "category": "business", "severity": "high", "evidence": "Из in-memory хранилища удалена проверка productId при повторном ключе.", "files": ["src/store.ts"] }
+  ],
+  "checkPlan": [],
+  "requirements": [
+    { "id": "AC-1", "status": "not_covered", "tests": [], "rationale": "Нет теста на ключ из 4–7 символов." },
+    { "id": "AC-2", "status": "covered", "tests": [
+      { "file": "src/tests/core.test.ts", "name": "store validates product itself and preserves conflict semantics without catalog cache" },
+      { "file": "tests/test_http.py", "name": "test_same_key_different_payload_returns_conflict" }
+    ], "rationale": "Заявление противоречит результатам: оба теста падают." }
+  ],
+  "uncoveredScenarios": [],
+  "suggestions": [
+    { "kind": "test", "title": "Тест на минимальную длину ключа", "details": "Проверить 3 символа → 400, 4 символа → 201.", "files": ["tests/test_http.py"] }
+  ]
+}

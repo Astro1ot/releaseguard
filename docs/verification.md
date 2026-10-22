@@ -94,3 +94,20 @@ The new `proof-tour` was started through the browser panel and passed all three
 real checks: integration, malformed/duplicate Kafka deliveries, and consumer
 recovery after database handler failure. See presentation-report.json for the
 exported historical result. The report is not a current health guarantee.
+
+## Canary, kind scenarios, GitLab CI and LLM review, 2026-10-22
+
+Environment of this check: Windows host without Docker, kind or kubectl; Node.js 24.19.0; portable Python 3.12.10; Helm 3.19.0 (Windows binary, checksum verified).
+
+Verified locally:
+
+- TypeScript build and 35 Node tests: existing tests plus scenario/report/release-gate logic, load generator counters, LLM context parsing, guard rules, fallback when the model is unavailable, MR note upsert and the three demo merge requests.
+- `npm run test:ci` writes `artifacts/junit/node.xml` (35 test cases) and `artifacts/coverage/lcov.info` mapped back to `src/*.ts`.
+- 20 Python tests through `scripts/ci/unittest_junit.py`; the runner records failures, errors and skips and exits non-zero on failure.
+- `helm lint --strict` for `environments/local.yaml` and `environments/kind-progressive.yaml`; `helm template` for staging and canary mode; a misspelled value is still rejected.
+- YAML parsing of `.gitlab-ci.yml` and the kind manifests; every job's stage and `needs` reference exists. `bash -n` for all shell scripts.
+- Demo-mode API: `scripts/scenarios/in-pod-smoke.cjs` passed, responses carry `X-App-Version`, `catalog-slow` adds about 0.9 s, the load generator counts responses per version.
+- `node scripts/llm/eval.mjs`: the guard corrects every planted unsupported coverage claim in the three demo cases. Writing the cases exposed a defect (the acceptance-criteria heading regex used ASCII-only `\b` and missed «Критерии приёмки»); fixed and covered by a test.
+- `scripts/llm/review.mjs` without an API key produces the "unavailable" report and exits 0.
+
+Not executed in this environment: the kind stand (Istio, Argo Rollouts, Prometheus) and all kind scenarios, the Compose regression, the GitLab pipeline itself, and the live LLM review/evaluation. No measured values are claimed for them; see `artifacts/report.md` after a run.

@@ -1,0 +1,6 @@
+# Canary stand: Argo Rollouts + Istio, analysis thresholds come from values.yaml defaults.
+replicaCount: 3
+image: {repository: releaseguard, tag: local, pullPolicy: IfNotPresent}
+app: {version: v1, fault: none, secretName: releaseguard-secrets}
+lab: {enabled: true, storageSize: 1Gi}
+progressiveDelivery: {enabled: true}

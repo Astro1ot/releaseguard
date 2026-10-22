@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="demo" tests="34" failures="0">
+  <testcase classname="src/tests/core.test.ts" name="same idempotency key returns the same order under concurrency" time="0.01"></testcase>
+  <testcase classname="src/tests/core.test.ts" name="store validates product itself and preserves conflict semantics without catalog cache" time="0.01"></testcase>
+  <testcase classname="src/tests/core.test.ts" name="cold cache coalesces concurrent origin reads" time="0.01"></testcase>
+  <testcase classname="src/tests/core.test.ts" name="failed origin is retryable and not cached" time="0.01"></testcase>
+  <testcase classname="src/tests/core.test.ts" name="status debounces failure and recovery and closes the same incident" time="0.01"></testcase>
+  <testcase classname="src/tests/core.test.ts" name="unknown is not presented as healthy" time="0.01"></testcase>
+  <testcase classname="src/tests/core.test.ts" name="expired checks lose green status and require a fresh confirmation window" time="0.01"></testcase>
+  <testcase classname="src/tests/core.test.ts" name="a stale incident is neither duplicated nor silently resolved" time="0.01"></testcase>
+  <testcase classname="src/tests/fulfillment.test.ts" name="event decoder rejects malformed, tombstone, oversized and foreign-shaped events" time="0.01"></testcase>
+  <testcase classname="src/tests/fulfillment.test.ts" name="quarantine storage failure rolls back and propagates so offset is not acknowledged" time="0.01"></testcase>
+  <testcase classname="tests/order-recovery.test.mjs" name="unknown order survives reload with original key and product" time="0.01"></testcase>
+  <testcase classname="tests/order-recovery.test.mjs" name="corrupt storage never silently becomes a new order" time="0.01"></testcase>
+  <testcase classname="tests/order-recovery.test.mjs" name="response must belong to original product and stable order ID" time="0.01"></testcase>
+  <testcase classname="tests/order-recovery.test.mjs" name="another tab cannot create an order while the lock is held" time="0.01"></testcase>
+  <testcase classname="tests/test_cli.py" name="test_missing_release_is_distinct_from_helm_failure" time="0.01"></testcase>
+  <testcase classname="tests/test_cli.py" name="test_uses_deployed_revision_not_latest_history_entry" time="0.01"></testcase>
+  <testcase classname="tests/test_cli.py" name="test_failed_smoke_rolls_back_exact_revision_and_keeps_exit_failure" time="0.01"></testcase>
+  <testcase classname="tests/test_cli.py" name="test_recovery_failure_is_not_reported_as_success" time="0.01"></testcase>
+  <testcase classname="tests/test_cli.py" name="test_first_install_never_rolls_back_to_unknown_revision" time="0.01"></testcase>
+  <testcase classname="tests/test_cli.py" name="test_latest_tag_rejected" time="0.01"></testcase>
+  <testcase classname="tests/test_cli.py" name="test_invalid_json_in_business_response_triggers_recovery" time="0.01"></testcase>
+  <testcase classname="tests/test_http.py" name="test_business_smoke_reaches_completion" time="0.01"></testcase>
+  <testcase classname="tests/test_http.py" name="test_same_key_different_payload_returns_conflict" time="0.01"></testcase>
+  <testcase classname="tests/test_http.py" name="test_disabled_dependencies_are_not_shown_as_healthy" time="0.01"></testcase>
+  <testcase classname="tests/test_http.py" name="test_bad_release_is_ready_but_fails_business_gate" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_page_is_local_and_contains_session_token" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_commands_reject_missing_csrf_token" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_commands_reject_cross_origin_even_with_token" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_arbitrary_commands_are_not_accepted" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_unknown_host_is_rejected" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_invalid_shapes_and_duplicate_fields_are_rejected" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_report_contains_dated_results_without_session_token" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_second_command_launch_failure_cannot_report_success" time="0.01"></testcase>
+  <testcase classname="tests/test_presenter.py" name="test_history_write_failure_keeps_result_available" time="0.01"></testcase>
+</testsuite>

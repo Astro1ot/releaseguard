@@ -1,0 +1,21 @@
+{
+  "summary": "Синтетический ответ для проверки guard: содержит заведомо неподтверждённое заявление о покрытии AC-3.",
+  "riskLevel": "high",
+  "risks": [
+    { "title": "Удаление orders.status ломает предыдущую версию", "category": "compatibility", "severity": "high", "evidence": "Миграция 006 выполняет DROP COLUMN status, а предыдущая версия читает и обновляет orders.status; откат приложения после миграции приведёт к ошибкам.", "files": ["migrations/006_fulfillment_table.sql"] }
+  ],
+  "checkPlan": [
+    { "kind": "business", "title": "Заказ доходит до completed после события Kafka", "steps": ["Создать заказ", "Дождаться обработки события", "Проверить GET /api/orders/:id"], "requirements": ["AC-1"], "existingTests": [{ "file": "tests/test_http.py", "name": "test_business_smoke_reaches_completion" }] }
+  ],
+  "requirements": [
+    { "id": "AC-1", "status": "partial", "tests": [{ "file": "tests/test_http.py", "name": "test_business_smoke_reaches_completion" }], "rationale": "Сквозной smoke проверяет completed, но в demo-режиме без PostgreSQL." },
+    { "id": "AC-2", "status": "covered", "tests": [{ "file": "src/tests/core.test.ts", "name": "same idempotency key returns the same order under concurrency" }], "rationale": "Конкурентные повторы с одним ключом дают один заказ." },
+    { "id": "AC-3", "status": "covered", "tests": [{ "file": "tests/test_migrations.py", "name": "test_old_version_survives_fulfillment_migration" }], "rationale": "Заведомо несуществующий тест: guard должен понизить статус." }
+  ],
+  "uncoveredScenarios": [
+    { "title": "Старая версия после миграции 006", "why": "Нет теста, запускающего предыдущий образ на новой схеме.", "requirements": ["AC-3"] }
+  ],
+  "suggestions": [
+    { "kind": "code", "title": "Разделить миграцию на expand и contract", "details": "Оставить orders.status до следующего релиза, писать в обе таблицы.", "files": ["migrations/006_fulfillment_table.sql", "src/fulfillment.ts"] }
+  ]
+}

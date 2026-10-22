@@ -11,6 +11,13 @@ spec:
     - from:
         - podSelector: {}
       ports: [{port: {{ .Values.service.port }}, protocol: TCP}]
+{{- if .Values.progressiveDelivery.enabled }}
+    # Prometheus scrapes the Istio agent's merged app + Envoy metrics endpoint.
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ .Values.progressiveDelivery.monitoringNamespace }}}
+      ports: [{port: 15020, protocol: TCP}]
+{{- end }}
 {{- if .Values.lab.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
@@ -25,5 +32,7 @@ spec:
     - from:
         - podSelector: {matchLabels: {app: {{ .Release.Name }}}}
         - podSelector: {matchLabels: {releaseguard/dependency: {{ .Release.Name }}}}
+        # One-off clients such as a candidate migration Job (outside the API Service selector).
+        - podSelector: {matchLabels: {releaseguard/client: {{ .Release.Name }}}}
 {{- end }}
 {{- end }}

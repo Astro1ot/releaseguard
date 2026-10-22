@@ -1,0 +1,35 @@
+# Constant synthetic traffic inside the mesh (namespace must have istio-injection=enabled).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: releaseguard-loadgen
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: releaseguard-loadgen}
+  template:
+    metadata:
+      labels: {app: releaseguard-loadgen}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9100'
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: loadgen
+          image: releaseguard:local
+          imagePullPolicy: IfNotPresent
+          command: [node, /loadgen/loadgen.mjs]
+          env:
+            - {name: TARGET, value: 'http://releaseguard:3000'}
+            - {name: RPS, value: '25'}
+            - {name: ORDER_SHARE, value: '0.2'}
+          ports: [{name: metrics, containerPort: 9100}]
+          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: 500m, memory: 192Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: script, mountPath: /loadgen, readOnly: true}]
+      volumes:
+        - name: script
+          configMap: {name: releaseguard-loadgen}

@@ -1,0 +1,9 @@
+{
+  "purpose": "Behavioural regression hidden in a refactor: the conflict check is removed while the acceptance criteria require it; two existing tests fail.",
+  "expectedRisks": [
+    { "description": "Reusing a key for another product no longer returns 409", "pattern": "409|conflict|конфликт|другим\\s+productId|другого\\s+товара|другой\\s+товар" },
+    { "description": "Shorter keys raise collision / guessing risk", "pattern": "коллизи|перебор|угадыв|энтропи|collision|4\\s*символ" }
+  ],
+  "mustNotBeCovered": ["AC-1", "AC-2"],
+  "minCorrectionsRecorded": 1
+}

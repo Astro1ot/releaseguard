@@ -25,6 +25,7 @@ class AppController {
   @Get('health/ready') ready() { if (draining) throw new ServiceUnavailableException('Draining'); return { status: 'ready' }; }
   @Get('api/catalog') async catalog() {
     if (process.env.RELEASE_FAULT === 'catalog-500') throw new ServiceUnavailableException('Injected release regression');
+    if (process.env.RELEASE_FAULT === 'catalog-slow') await new Promise(resolve => setTimeout(resolve, 900)); // Latency regression for canary analysis drills.
     try { return { products: await cache.get(() => store.catalog()) }; } catch { throw new ServiceUnavailableException('Catalog temporarily unavailable'); }
   }
   @Post('api/orders') @HttpCode(201)
@@ -66,6 +67,8 @@ async function main() {
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
     if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+    // Lets in-mesh traffic generators attribute each response to stable or canary. The public edge hides it.
+    res.setHeader('X-App-Version', process.env.APP_VERSION ?? 'development');
     const start = performance.now();
     res.on('finish', () => {
       if (!req.path.startsWith('/api/') || req.path === '/api/status') return;

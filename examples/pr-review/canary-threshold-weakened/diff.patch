@@ -1,0 +1,18 @@
+diff --git a/charts/releaseguard/values.yaml b/charts/releaseguard/values.yaml
+index 0ffed3b..76788b7 100644
+--- a/charts/releaseguard/values.yaml
++++ b/charts/releaseguard/values.yaml
+@@ -35,10 +35,10 @@ progressiveDelivery:
+     initialDelay: 30s
+     interval: 20s
+     count: 4
+-    failureLimit: 1
++    failureLimit: 5
+     consecutiveErrorLimit: 2
+     minRequests: 40
+-    maxErrorRatio: 0.02
++    maxErrorRatio: 0.25
+     maxErrorRatioDeltaVsStable: 0.01
+-    maxP95LatencyMs: 400
++    maxP95LatencyMs: 2000
+     maxP95LatencyDeltaVsStableMs: 200

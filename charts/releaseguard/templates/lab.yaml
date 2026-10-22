@@ -10,7 +10,7 @@ spec:
     matchLabels: {app: '{{ .Release.Name }}-postgres'}
   template:
     metadata:
-      labels: {app: '{{ .Release.Name }}-postgres', releaseguard/dependency: {{ .Release.Name }}}
+      labels: {app: '{{ .Release.Name }}-postgres', releaseguard/dependency: {{ .Release.Name }}, sidecar.istio.io/inject: 'false'}
     spec:
       automountServiceAccountToken: false
       containers:
@@ -52,7 +52,7 @@ spec:
     matchLabels: {app: '{{ .Release.Name }}-redis'}
   template:
     metadata:
-      labels: {app: '{{ .Release.Name }}-redis', releaseguard/dependency: {{ .Release.Name }}}
+      labels: {app: '{{ .Release.Name }}-redis', releaseguard/dependency: {{ .Release.Name }}, sidecar.istio.io/inject: 'false'}
     spec:
       automountServiceAccountToken: false
       containers:
@@ -81,7 +81,7 @@ spec:
     matchLabels: {app: '{{ .Release.Name }}-kafka'}
   template:
     metadata:
-      labels: {app: '{{ .Release.Name }}-kafka', releaseguard/dependency: {{ .Release.Name }}}
+      labels: {app: '{{ .Release.Name }}-kafka', releaseguard/dependency: {{ .Release.Name }}, sidecar.istio.io/inject: 'false'}
     spec:
       automountServiceAccountToken: false
       containers:

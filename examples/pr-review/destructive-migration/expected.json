@@ -1,0 +1,9 @@
+{
+  "purpose": "Destructive expand/contract violation: the previous application version still reads and writes orders.status.",
+  "expectedRisks": [
+    { "description": "DROP COLUMN orders.status breaks the previous version / rollback", "pattern": "(drop|удал)[^.]{0,80}status|status[^.]{0,80}(drop|удал)|(предыдущ|стар)[^.]{0,40}верси|откат" },
+    { "description": "Migration is not expand-only (contract change in the same release)", "pattern": "expand|contract|необратим|обратн[^.]{0,20}совмест|check_migrations" }
+  ],
+  "mustNotBeCovered": ["AC-3"],
+  "minCorrectionsRecorded": 1
+}

@@ -1,0 +1,67 @@
+{
+  "description": "Mandatory evidence for a release. The optional LLM review (artifacts/llm-review) is advisory and is never read by the gate.",
+  "junit": [
+    "artifacts/junit/node.xml",
+    "artifacts/junit/python.xml",
+    "artifacts/junit-scenarios.xml"
+  ],
+  "evidence": [
+    {
+      "name": "PostgreSQL/Redis/Kafka business integration",
+      "test": "integration",
+      "file": "scripts/integration.py",
+      "pattern": "artifacts/integration.json"
+    },
+    {
+      "name": "Kafka malformed and duplicate deliveries",
+      "test": "broker-contract",
+      "file": "scripts/broker_contract.py",
+      "pattern": "artifacts/broker-contract.json"
+    },
+    {
+      "name": "Kafka consumer recovery",
+      "test": "consumer-recovery",
+      "file": "scripts/consumer_recovery.py",
+      "pattern": "artifacts/consumer-recovery.json"
+    },
+    {
+      "name": "Redis outage drill",
+      "test": "drill-redis",
+      "file": "scripts/drill.py",
+      "pattern": "artifacts/drills/redis-*.json"
+    },
+    {
+      "name": "Kafka outage drill",
+      "test": "drill-kafka",
+      "file": "scripts/drill.py",
+      "pattern": "artifacts/drills/kafka-*.json"
+    },
+    {
+      "name": "Edge rate limit drill",
+      "test": "drill-rate-limit",
+      "file": "scripts/drill.py",
+      "pattern": "artifacts/drills/rate-limit-*.json"
+    },
+    {
+      "name": "PostgreSQL migration under writes",
+      "test": "migration-drill",
+      "file": "scripts/migration_drill.py",
+      "pattern": "artifacts/drills/migration-*.json"
+    },
+    {
+      "name": "Monitoring integration",
+      "test": "observability",
+      "file": "scripts/check_observability.py",
+      "pattern": "artifacts/observability.json"
+    }
+  ],
+  "kindScenarios": [
+    "stand-setup",
+    "canary-promote",
+    "canary-errors",
+    "canary-latency",
+    "pod-kill",
+    "migration-compat",
+    "helm-rollback"
+  ]
+}

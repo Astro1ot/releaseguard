@@ -1,0 +1,9 @@
+{
+  "purpose": "Release safety regression: thresholds are loosened to 25% errors and 2 s p95; the kind error scenario injects ~80% errors and would still pass, so it does not prove the 2% criterion.",
+  "expectedRisks": [
+    { "description": "Error threshold 0.25 contradicts the 2% acceptance criterion", "pattern": "0[.,]25|25\\s*%|2\\s*%|maxErrorRatio" },
+    { "description": "failureLimit 5 / p95 2000 ms delays or prevents rollback", "pattern": "failureLimit|2000|2\\s*с|задержк|latency" }
+  ],
+  "mustNotBeCovered": ["AC-1", "AC-2"],
+  "minCorrectionsRecorded": 1
+}

@@ -1,0 +1,16 @@
+{
+  "summary": "Синтетический ответ для проверки guard: AC-1 заявлен покрытым kind-сценарием, результата которого в pipeline нет.",
+  "riskLevel": "high",
+  "risks": [
+    { "title": "Порог ошибок 25% противоречит критерию 2%", "category": "release", "severity": "high", "evidence": "maxErrorRatio изменён с 0.02 на 0.25.", "files": ["charts/releaseguard/values.yaml"] }
+  ],
+  "checkPlan": [],
+  "requirements": [
+    { "id": "AC-1", "status": "covered", "tests": [{ "file": "scripts/scenarios", "name": "canary-errors" }], "rationale": "Сценарий существует, но в этом pipeline не запускался." },
+    { "id": "AC-2", "status": "partial", "tests": [{ "file": "scripts/scenarios", "name": "canary-latency" }], "rationale": "Сценарий проверяет устойчивую задержку, а не кратковременный всплеск." }
+  ],
+  "uncoveredScenarios": [
+    { "title": "Canary с долей ошибок между 2% и 25%", "why": "Сценарий canary-errors даёт около 80% ошибок и пройдёт при любом пороге ниже 80%.", "requirements": ["AC-1"] }
+  ],
+  "suggestions": []
+}

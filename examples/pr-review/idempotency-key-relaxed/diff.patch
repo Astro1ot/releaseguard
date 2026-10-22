@@ -1,0 +1,26 @@
+diff --git a/src/main.ts b/src/main.ts
+index 6aa36a5..f75a8a4 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -30,7 +30,7 @@ class AppController {
+   }
+   @Post('api/orders') @HttpCode(201)
+   async order(@Body() body: unknown, @Headers('idempotency-key') key?: string) {
+-    if (!key || !/^[A-Za-z0-9_-]{8,100}$/.test(key)) throw new BadRequestException('Idempotency-Key must contain 8–100 letters, digits, _ or -');
++    if (!key || !/^[A-Za-z0-9_-]{4,100}$/.test(key)) throw new BadRequestException('Idempotency-Key must contain 4–100 letters, digits, _ or -');
+     if (!body || typeof body !== 'object' || !('productId' in body) || typeof body.productId !== 'string' || Object.keys(body).some(k => k !== 'productId')) throw new BadRequestException('Expected { productId: string }');
+     try {
+       return await store.create(body.productId, key);
+diff --git a/src/store.ts b/src/store.ts
+index 639a890..d92712d 100644
+--- a/src/store.ts
++++ b/src/store.ts
+@@ -30,7 +30,7 @@ export class Store {
+   async create(productId: string, key: string): Promise<Order> {
+     if (!this.pool) {
+       const existing = this.keys.get(key);
+-      if (existing) { const order = this.orders.get(existing)!; if (order.productId !== productId) throw new Conflict('Idempotency key reused with different payload'); return order; }
++      if (existing) return this.orders.get(existing)!;
+       if (!products.some(p => p.id === productId)) throw new ProductNotFound('Product not found');
+       const order = { id: randomUUID(), productId, status: 'completed', createdAt: new Date().toISOString() };
+       this.orders.set(order.id, order); this.keys.set(key, order.id); return order;
