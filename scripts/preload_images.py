@@ -7,6 +7,7 @@ import platform
 
 ROOT = Path(__file__).resolve().parents[1]
 os.environ['PATH'] = str(ROOT / '.tools') + os.pathsep + os.environ['PATH']
+CLUSTER = os.environ.get('RG_CLUSTER', 'releaseguard')
 IMAGES = ['postgres:17.6-bookworm', 'redis:7.4.5-alpine', 'apache/kafka:3.9.1', 'nginxinc/nginx-unprivileged:1.28-alpine']
 
 if __name__ == '__main__':
@@ -22,4 +23,4 @@ if __name__ == '__main__':
         assert Path(directory).resolve().is_relative_to(artifacts)
         archive = str(Path(directory) / 'dependencies.tar')
         subprocess.run(['docker', 'image', 'save', '--platform', f'linux/{arch}', '-o', archive, *IMAGES], check=True)
-        subprocess.run(['kind', 'load', 'image-archive', archive, '--name', 'releaseguard'], check=True)
+        subprocess.run(['kind', 'load', 'image-archive', archive, '--name', CLUSTER], check=True)

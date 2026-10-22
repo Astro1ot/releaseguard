@@ -32,11 +32,17 @@ def request(base, path, *, body=None, key=None):
         return json.load(response)
 
 
-def smoke(base: str, *, fulfillment=True, timeout=45):
+def smoke(base: str, *, fulfillment=True, timeout=45, soak_seconds=0):
     started = time.monotonic()
     catalog = request(base, '/api/catalog')['products']
     if not catalog:
         raise RuntimeError('Catalog is empty')
+    # Right after a rollout the previous pod can still be in the endpoint list and answer for the
+    # new release. Keep probing until it is gone so a regression is not masked by one lucky reply.
+    until = time.monotonic() + soak_seconds
+    while time.monotonic() < until:
+        request(base, '/api/catalog')
+        time.sleep(0.5)
     body = {'productId': catalog[0]['id']}
     key = str(uuid.uuid4())
     first = request(base, '/api/orders', body=body, key=key)
@@ -90,7 +96,7 @@ def deploy(args):
     try:
         run(['helm', 'upgrade', '--install', args.release, str(ROOT / 'charts/releaseguard'),
              *helm_base(args), *flags, '--atomic', '--wait', '--timeout', '300s', '--history-max', '10'])
-        report['smoke'] = smoke(args.url)
+        report['smoke'] = smoke(args.url, soak_seconds=10)
         report['result'] = 'passed'
     except (subprocess.CalledProcessError, RuntimeError, OSError, ValueError, KeyError, TypeError) as error:
         report['result'] = 'failed'

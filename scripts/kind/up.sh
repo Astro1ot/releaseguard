@@ -43,6 +43,10 @@ data:
       sha256: $plugin_sha
 EOF
 "${KUBECTL[@]}" apply -f deploy/kind/argo-rollouts-gatewayapi-rbac.yaml
+# The controller serves /healthz only after downloading the plugin (~77 MB); a startupProbe keeps the
+# liveness probe from killing it on a slow link (up to 10 minutes). It is not part of install.yaml, so
+# it does not conflict with the server-side apply above.
+"${KUBECTL[@]}" -n argo-rollouts patch deploy/argo-rollouts --type=strategic -p '{"spec":{"template":{"spec":{"containers":[{"name":"argo-rollouts","startupProbe":{"httpGet":{"path":"/healthz","port":"healthz"},"periodSeconds":10,"failureThreshold":60}}]}}}}'
 # The controller loads plugins only at startup.
 "${KUBECTL[@]}" -n argo-rollouts rollout restart deploy/argo-rollouts
 "${KUBECTL[@]}" -n argo-rollouts rollout status deploy/argo-rollouts --timeout=300s

@@ -6,6 +6,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 spec = importlib.util.spec_from_file_location('rg', Path(__file__).resolve().parents[1] / 'cli/rg.py')
 rg = importlib.util.module_from_spec(spec)
@@ -54,6 +55,21 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(rg.deploy(self.args()), 1)
             report = json.loads(next((Path(folder) / 'artifacts/releases').glob('*.json')).read_text())
             self.assertEqual(report['rollback'], 'verified')
+
+    def test_soak_catches_regression_hidden_behind_an_old_pod(self):
+        # First reply comes from the old pod, the next ones from the faulty new release.
+        replies = [{'products': [{'id': 'asset-01'}]}, {'products': [{'id': 'asset-01'}]}, HTTPError('http://x/api/catalog', 503, 'unavailable', None, None)]
+        def fake_request(base, path, **kwargs):
+            reply = replies.pop(0)
+            if isinstance(reply, Exception): raise reply
+            return reply
+        with patch.object(rg, 'request', side_effect=fake_request), patch.object(rg.time, 'sleep'):
+            with self.assertRaises(HTTPError): rg.smoke('http://localhost:3000', soak_seconds=5)
+
+    def test_deploy_runs_the_soak_before_accepting_a_release(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(rg, 'ROOT', Path(folder)), patch.object(rg, 'previous_revision', return_value=1), patch.object(rg, 'run'), patch.object(rg, 'smoke', return_value={'passed': True}) as smoke:
+            self.assertEqual(rg.deploy(self.args()), 0)
+            self.assertGreater(smoke.call_args.kwargs['soak_seconds'], 0)
 
 
 if __name__ == '__main__': unittest.main()
