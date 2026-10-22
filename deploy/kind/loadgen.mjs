@@ -4,6 +4,7 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
 
 export class Tally {
   constructor() { this.counts = new Map(); this.latencyMs = []; }
@@ -54,4 +55,4 @@ function main() {
   console.log(JSON.stringify({ event: 'loadgen_started', target, rps, orderShare }));
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main();
